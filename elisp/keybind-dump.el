@@ -2,8 +2,7 @@
 
 ;;; Commentary:
 
-;; Dumps keybindings registered across Emacs keymaps to JSONL (one JSON object per line).
-;; Based on and extending /Users/sin/tmp/my-keybind-dump.el.
+;; Dumps keybindings registered across Emacs keymaps to JSONL (one JSON object per line)
 
 ;;; Code:
 
