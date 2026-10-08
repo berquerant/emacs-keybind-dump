@@ -1,4 +1,10 @@
+import sys
+from pathlib import Path
 import unittest
+
+# Ensure src is in sys.path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from keybind_dump.models import KeyBinding, KeybindCollection
 from keybind_dump.stats import sequence_duplicate_stats, keymap_duplicate_stats
 from keybind_dump.mermaid import generate_mermaid_venn
@@ -13,6 +19,7 @@ class TestKeybindModels(unittest.TestCase):
             KeyBinding("q", "dired-mode-map", "quit-window"),
             KeyBinding("q", "help-mode-map", "quit-window"),
             KeyBinding("h", "help-mode-map", "describe-mode"),
+            KeyBinding('"', "quote-mode-map", "self-insert-command"),
         ]
         self.coll = KeybindCollection(self.bindings)
 
@@ -71,6 +78,8 @@ class TestKeybindModels(unittest.TestCase):
         self.assertIn("subgraph km_global_map", chart)
         self.assertIn("Shared / Intersecting Keybindings", chart)
         self.assertIn("C-x C-f", chart)
+        # Quote escaping test
+        self.assertIn("&quot;", chart)
 
 
 if __name__ == "__main__":

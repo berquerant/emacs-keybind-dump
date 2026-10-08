@@ -22,24 +22,26 @@
                                   km)))
                     (when (and actual (keymapp actual) (not (memq actual visited-maps)))
                       (push actual visited-maps)
-                      (map-keymap
-                       (lambda (event binding)
-                         (let ((full-vec (vconcat prefix-vec (vector event))))
-                           (cond
-                            ((keymapp binding)
-                             (when (< (length prefix-vec) 8)
-                               (walk binding full-vec)))
-                            ((and binding (not (numberp binding)))
-                             (let ((seq (key-description full-vec))
-                                   (cmd (cond
-                                         ((symbolp binding) (symbol-name binding))
-                                         ((stringp binding) binding)
-                                         (t (format "%s" binding)))))
-                               (push `((sequence . ,seq)
-                                       (keymap . ,map-name)
-                                       (command . ,cmd))
-                                     items))))))
-                       actual)))))
+                      (condition-case _err
+                          (map-keymap
+                           (lambda (event binding)
+                             (let ((full-vec (vconcat prefix-vec (vector event))))
+                               (cond
+                                ((keymapp binding)
+                                 (when (< (length prefix-vec) 8)
+                                   (walk binding full-vec)))
+                                ((and binding (not (numberp binding)))
+                                 (let ((seq (key-description full-vec))
+                                       (cmd (cond
+                                             ((symbolp binding) (symbol-name binding))
+                                             ((stringp binding) binding)
+                                             (t (format "%s" binding)))))
+                                   (push `((sequence . ,seq)
+                                           (keymap . ,map-name)
+                                           (command . ,cmd))
+                                         items))))))
+                           actual)
+                        (error nil))))))
       (walk keymap []))
     (nreverse items)))
 

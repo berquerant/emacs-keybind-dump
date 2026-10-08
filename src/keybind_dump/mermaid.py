@@ -18,6 +18,16 @@ def _sanitize_id(name: str) -> str:
     return res
 
 
+def _escape_label(text: str) -> str:
+    """Escape characters for safe Mermaid node labels enclosed in double quotes."""
+    return (
+        html.escape(text, quote=True)
+        .replace('"', "&quot;")
+        .replace("[", "&#91;")
+        .replace("]", "&#93;")
+    )
+
+
 def generate_mermaid_venn(
     collection: KeybindCollection,
     target_keymaps: list[str] | None = None,
@@ -57,14 +67,15 @@ def generate_mermaid_venn(
     sorted_maps = sorted(all_maps)
     for km in sorted_maps:
         km_id = f"km_{_sanitize_id(km)}"
-        lines.append(f'  subgraph {km_id}["Keymap: {km}"]')
+        km_title = _escape_label(km)
+        lines.append(f'  subgraph {km_id}["Keymap: {km_title}"]')
 
         # Pure items exclusive to this keymap
         pure_seqs = sorted(groups.get(frozenset([km]), []))
         if pure_seqs:
             disp_seqs = pure_seqs[:max_items_per_group]
             extra = len(pure_seqs) - len(disp_seqs)
-            body = "<br/>".join(html.escape(s) for s in disp_seqs)
+            body = "<br/>".join(_escape_label(s) for s in disp_seqs)
             if extra > 0:
                 body += f"<br/><i>... and {extra} more</i>"
             exclusive_id = f"{km_id}_exclusive"
@@ -89,8 +100,8 @@ def generate_mermaid_venn(
             inter_id = f"inter_{idx}"
             disp_seqs = sorted(seqs)[:max_items_per_group]
             extra = len(seqs) - len(disp_seqs)
-            km_labels = " ∩ ".join(kms)
-            body = "<br/>".join(html.escape(s) for s in disp_seqs)
+            km_labels = " ∩ ".join(_escape_label(k) for k in kms)
+            body = "<br/>".join(_escape_label(s) for s in disp_seqs)
             if extra > 0:
                 body += f"<br/><i>... and {extra} more</i>"
             lines.append(

@@ -1,12 +1,15 @@
 [tools]
 python = "3.14"
 
+[env]
+PYTHONPATH = "src"
+
 [tasks.dump]
 description = "Dump Emacs keybindings to JSONL"
 run = "./bin/dump.sh"
 
 [tasks.test]
-description = "Run tests"
+description = "Run tests with mise python"
 run = "python3 -m unittest discover -s tests"
 
 [tasks.cli]

@@ -20,12 +20,11 @@ Dump, analyze, filter, and visualize Emacs keybindings across keymaps.
 ## Setup & Requirements
 
 - Emacs (>= 27.x)
-- Python 3.10+
-- [mise-en-place](https://mise.jdx.dev/)
+- [mise-en-place](https://mise.jdx.dev/) (manages Python 3.14)
 
 ```bash
 mise run dump       # Dump keybindings to JSONL stdout
-mise run test       # Run Python test suite
+mise run test       # Run test suite with mise's Python
 ```
 
 ## Usage
@@ -34,41 +33,45 @@ mise run test       # Run Python test suite
 
 ```bash
 ./bin/dump.sh > keybindings.jsonl
+# or via mise
+mise run dump > keybindings.jsonl
 ```
 
 ### 2. Transform to `{sequence: {keymap: command}}`
 
 ```bash
-python3 -m keybind_dump transform keybindings.jsonl
+./bin/keybind-dump transform keybindings.jsonl
+# or via mise
+mise run cli -- transform keybindings.jsonl
 ```
 
 ### 3. Display Duplicates
 
 ```bash
-python3 -m keybind_dump duplicates keybindings.jsonl
+./bin/keybind-dump duplicates keybindings.jsonl
 ```
 
 ### 4. Duplicate Statistics
 
 ```bash
 # Top duplicate sequences and most overlapping keymaps
-python3 -m keybind_dump stats keybindings.jsonl --limit 10
+./bin/keybind-dump stats keybindings.jsonl --limit 10
 ```
 
 ### 5. Filter & Search
 
 ```bash
 # Search by sequence
-python3 -m keybind_dump search keybindings.jsonl --sequence "C-x C-f"
+./bin/keybind-dump search keybindings.jsonl --sequence "C-x C-f"
 
 # Filter by regex
-python3 -m keybind_dump filter keybindings.jsonl --keymap-regex "Buffer-menu" --format json
+./bin/keybind-dump filter keybindings.jsonl --keymap-regex "Buffer-menu" --format json
 ```
 
 ### 6. Mermaid Venn-like Visualization
 
 ```bash
-python3 -m keybind_dump mermaid keybindings.jsonl \
+./bin/keybind-dump mermaid keybindings.jsonl \
   --keymap Buffer-menu-mode-map \
   --keymap tabulated-list-mode-map
 ```

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import sys
 from typing import List, Optional
 
@@ -20,6 +22,13 @@ def _load_collection(file_path: Optional[str]) -> KeybindCollection:
         with open(file_path, "r", encoding="utf-8") as f:
             return KeybindCollection.from_jsonl(f)
     else:
+        if sys.stdin.isatty():
+            print(
+                "Error: No input file specified and stdin is an interactive terminal.\n"
+                "Please provide a JSONL file or pipe data via stdin. (Run with -h for help)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         return KeybindCollection.from_jsonl(sys.stdin)
 
 
@@ -117,6 +126,10 @@ def cmd_mermaid(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    # Handle broken pipe smoothly when stdout is closed early (e.g. piped to head)
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
     parser = argparse.ArgumentParser(
         prog="keybind-dump",
         description="Emacs keybinding analyzer, stats, query, and Venn-like Mermaid visualizer",
@@ -170,7 +183,15 @@ def main() -> None:
     p_mermaid.set_defaults(func=cmd_mermaid)
 
     args = parser.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except BrokenPipeError:
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except OSError:
+            pass
+        sys.exit(141)
 
 
 if __name__ == "__main__":
