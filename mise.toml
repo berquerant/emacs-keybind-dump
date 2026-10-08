@@ -1,0 +1,14 @@
+[tools]
+python = "3.14"
+
+[tasks.dump]
+description = "Dump Emacs keybindings to JSONL"
+run = "./bin/dump.sh"
+
+[tasks.test]
+description = "Run tests"
+run = "python3 -m unittest discover -s tests"
+
+[tasks.cli]
+description = "Run CLI"
+run = "python3 -m keybind_dump"
