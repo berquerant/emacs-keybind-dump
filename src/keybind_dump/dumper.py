@@ -13,21 +13,22 @@ def get_elisp_path() -> Path:
     """Locate the keybind-dump.el Elisp script.
 
     Checks:
-    1. Relative to repository root (`../../elisp/keybind-dump.el`) for editable/local checkouts.
-    2. Within the packaged module directory for installed package distributions.
+    1. Within the packaged module directory (`./elisp/keybind-dump.el`).
+    2. Relative to repository root (`../../elisp/keybind-dump.el`) as fallback.
     """
+    # 1. Package data directory
+    pkg_dir = Path(__file__).resolve().parent / "elisp" / "keybind-dump.el"
+    if pkg_dir.is_file():
+        return pkg_dir
+
+    # 2. Check repo root fallback
     repo_root = Path(__file__).resolve().parent.parent.parent
     elisp_in_repo = repo_root / "elisp" / "keybind-dump.el"
     if elisp_in_repo.is_file():
         return elisp_in_repo
 
-    # 2. Check package data directory if installed
-    pkg_dir = Path(__file__).resolve().parent / "elisp" / "keybind-dump.el"
-    if pkg_dir.is_file():
-        return pkg_dir
-
     raise FileNotFoundError(
-        f"Could not find keybind-dump.el in {elisp_in_repo} or {pkg_dir}"
+        f"Could not find keybind-dump.el in {pkg_dir} or {elisp_in_repo}"
     )
 
 
