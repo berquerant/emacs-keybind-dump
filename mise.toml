@@ -13,6 +13,10 @@ run = "uv run keybind-dump -f jsonl"
 description = "Run tests with uv"
 run = "uv run python -m unittest discover -s tests"
 
+[tasks.lint]
+description = "Run linter with uv"
+run = "uv run ruff check src tests"
+
 [tasks.cli]
 description = "Run CLI with uv"
 run = "uv run keybind-dump"
