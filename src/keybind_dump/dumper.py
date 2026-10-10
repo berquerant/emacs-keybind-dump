@@ -121,16 +121,19 @@ def iter_dump(
 ):
     """Run Emacs in batch mode and yield dumped JSON Lines incrementally.
 
-    Streams output directly from the child process stdout to avoid buffering
-    large keybinding datasets in memory simultaneously.
+    Streams output line-by-line from the child process stdout to avoid buffering
+    large keybinding datasets (often tens of thousands of lines) in memory.
 
-    Stderr Handling:
-    - By default (`verbose=False`), a background daemon thread reads and buffers
-      stderr chunks without blocking stdout iteration.
-    - If Emacs terminates successfully (exit code 0), stderr buffer is discarded.
-    - If Emacs fails (non-zero exit code), buffered stderr is written to `sys.stderr`
+    Stderr & Lifetime Handling:
+    - Default (`verbose=False`): A background daemon thread drains and buffers
+      stderr concurrently to prevent OS pipe buffers from filling and deadlocking
+      stdout iteration.
+    - If Emacs terminates successfully (exit code 0), stderr buffer is discarded silently.
+    - If Emacs fails (non-zero exit code), buffered stderr is flushed to `sys.stderr`
       and a RuntimeError is raised.
-    - If `verbose=True`, stderr is passed directly through to `sys.stderr`.
+    - If `verbose=True`, stderr passes directly to `sys.stderr` in real time.
+    - When the generator is terminated early (e.g. caller breaks out of loop),
+      the `finally` block ensures the child process is terminated cleanly.
     """
     import threading
 
@@ -157,6 +160,7 @@ def iter_dump(
 
     reader_thread = None
     if not verbose:
+        # Spawn reader thread to drain stderr continuously and prevent child process blocking
         reader_thread = threading.Thread(target=_read_stderr, daemon=True)
         reader_thread.start()
 
@@ -164,9 +168,10 @@ def iter_dump(
         if proc.stdout:
             yield from proc.stdout
     finally:
+        # Guarantee child process termination and verify exit status on completion or early exit
         rc = proc.poll()
         if rc is None:
-            # If still running (e.g. generator closed early by caller)
+            # Child process still active (e.g., caller closed generator before EOF)
             proc.terminate()
             try:
                 rc = proc.wait(timeout=2)
@@ -179,6 +184,7 @@ def iter_dump(
         if reader_thread and reader_thread.is_alive():
             reader_thread.join(timeout=1)
 
+        # Non-zero exit code indicates batch dump failure (e.g. init syntax error or missing package)
         if rc != 0:
             if err_chunks:
                 sys.stderr.write("".join(err_chunks))

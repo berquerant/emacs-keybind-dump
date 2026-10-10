@@ -14,14 +14,16 @@
 (defun keybind-dump--extract-keymap (map-name keymap)
   "Extract leaf bindings from KEYMAP named MAP-NAME.
 
-Recursively traverses nested keymaps up to a prefix depth of 8 vectors.
-Tracks `visited-maps' to prevent infinite loops caused by circular keymap references."
+Recursively traverses nested prefix keymaps up to a depth limit of 8 vectors.
+Tracks `visited-maps' to prevent infinite recursion caused by circular references
+between parent and child keymaps, or self-referential mode maps."
   (let ((items nil)
         (visited-maps nil))
     (cl-labels ((walk (km prefix-vec)
                   (let ((actual (if (symbolp km)
                                     (and (boundp km) (symbol-value km))
                                   km)))
+                    ;; Avoid re-entering keymaps already visited in this branch to break cycles
                     (when (and actual (keymapp actual) (not (memq actual visited-maps)))
                       (push actual visited-maps)
                       (condition-case _err

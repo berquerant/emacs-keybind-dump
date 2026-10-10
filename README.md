@@ -41,6 +41,9 @@ mise run dump
 
 # Run test suite
 mise run test
+
+# Run linter and type checker
+mise run lint
 ```
 
 ---
