@@ -178,9 +178,9 @@ keybind-dump --stats sequence -f tsv
 | `--load, --load-before-dump FILE` | Dump | Load Elisp file before dumping. Can be repeated. |
 | `-v, --verbose` | Dump | Stream Emacs `stderr` even when execution succeeds. |
 | `-D, --duplicates-only` | Filter | Include only key sequences defined in 2 or more keymaps. |
-| `-s, --sequence PAT` | Filter | Regular expression filter for key sequences (e.g. `^C-c`). |
-| `-k, --keymap PAT` | Filter | Regular expression filter for keymaps. Can be specified multiple times; also defines TSV columns. |
-| `-c, --command PAT` | Filter | Regular expression filter for bound command names. |
+| `-s, --sequence PAT` | Filter | Regular expression filter for key sequences (e.g. `^C-c`). Can be specified multiple times (combined as OR). |
+| `-k, --keymap PAT` | Filter | Regular expression filter for keymaps. Can be specified multiple times (combined as OR; also defines TSV columns). |
+| `-c, --command PAT` | Filter | Regular expression filter for bound command names. Can be specified multiple times (combined as OR). |
 | `--stats [TARGET]` | Stats | Calculate duplicate statistics (`sequence`, `keymap`, or `both`; default: `both`). |
 | `--min-count N` | Stats | Minimum duplicate count threshold for sequence statistics (default: `2`). |
 | `--limit N` | Options | Maximum number of records or statistics rows to display. |

@@ -330,6 +330,30 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
         self.assertLess(idx_pkg, idx_load)
         self.assertLess(idx_pkg, idx_eval)
 
+    def test_cli_multiple_pattern_options(self):
+        from keybind_dump.cli import _combine_regex_patterns, build_parser
+
+        parser = build_parser()
+        args = parser.parse_args([
+            "-s", "^C-x", "-s", "^q$",
+            "-k", "global-map", "-k", "dired-mode-map",
+            "-c", "find", "-c", "save",
+        ])
+
+        self.assertEqual(args.seq_patterns, ["^C-x", "^q$"])
+        self.assertEqual(args.keymap_patterns, ["global-map", "dired-mode-map"])
+        self.assertEqual(args.cmd_patterns, ["find", "save"])
+
+        # Check combined regexes
+        combined_seq = _combine_regex_patterns(args.seq_patterns)
+        combined_cmd = _combine_regex_patterns(args.cmd_patterns)
+        self.assertEqual(combined_seq, "(?:^C-x|^q$)")
+        self.assertEqual(combined_cmd, "(?:find|save)")
+
+        # Verify collection filtering with combined pattern matches either
+        filtered = self.coll.filter(sequence_pattern=combined_seq)
+        self.assertEqual(set(filtered.to_nested_dict().keys()), {"C-x C-f", "C-x C-s", "q"})
+
 
 if __name__ == "__main__":
     unittest.main()

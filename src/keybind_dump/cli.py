@@ -144,7 +144,13 @@ def build_parser() -> argparse.ArgumentParser:
     g_filter.add_argument(
         "-D", "--duplicates-only", action="store_true", help="Include only sequences with >=2 keymaps"
     )
-    g_filter.add_argument("-s", "--sequence", dest="seq_pattern", help="Filter by sequence regex pattern")
+    g_filter.add_argument(
+        "-s",
+        "--sequence",
+        action="append",
+        dest="seq_patterns",
+        help="Filter by sequence regex pattern (can be specified multiple times; combined as OR)",
+    )
     g_filter.add_argument(
         "-k",
         "--keymap",
@@ -152,7 +158,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="keymap_patterns",
         help="Filter by keymap regex pattern (can be specified multiple times; also defines TSV columns)",
     )
-    g_filter.add_argument("-c", "--command", dest="cmd_pattern", help="Filter by command regex pattern")
+    g_filter.add_argument(
+        "-c",
+        "--command",
+        action="append",
+        dest="cmd_patterns",
+        help="Filter by command regex pattern (can be specified multiple times; combined as OR)",
+    )
 
     # Stats mode option
     g_stats = parser.add_argument_group("Summary / Statistics options")
@@ -185,6 +197,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _combine_regex_patterns(patterns: Sequence[str] | None) -> str | None:
+    """Combine multiple regex patterns into a single non-capturing OR pattern."""
+    if not patterns:
+        return None
+    if len(patterns) == 1:
+        return patterns[0]
+    return f"(?:{'|'.join(patterns)})"
+
+
 def run_cli(args_list: Sequence[str] | None = None) -> None:
     """Execute CLI workflow with optional argument list."""
     if hasattr(signal, "SIGPIPE"):
@@ -205,19 +226,14 @@ def run_cli(args_list: Sequence[str] | None = None) -> None:
         load_before_dump=args.load_before_dump,
     )
 
-    # Combine keymap patterns if multiple specified (e.g. "^(km1|km2)$")
-    km_pattern = None
-    if args.keymap_patterns:
-        km_pattern = (
-            f"^({'|'.join(args.keymap_patterns)})$"
-            if len(args.keymap_patterns) > 1
-            else args.keymap_patterns[0]
-        )
+    seq_pattern = _combine_regex_patterns(args.seq_patterns)
+    km_pattern = _combine_regex_patterns(args.keymap_patterns)
+    cmd_pattern = _combine_regex_patterns(args.cmd_patterns)
 
     filtered = collection.filter(
-        sequence_pattern=args.seq_pattern,
+        sequence_pattern=seq_pattern,
         keymap_pattern=km_pattern,
-        command_pattern=args.cmd_pattern,
+        command_pattern=cmd_pattern,
         duplicates_only=args.duplicates_only,
     )
 
