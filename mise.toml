@@ -1,5 +1,6 @@
 [tools]
 python = "3.14"
+uv = "0.12.23"
 
 [env]
 PYTHONPATH = "src"
@@ -9,9 +10,9 @@ description = "Dump Emacs keybindings to JSONL"
 run = "./bin/dump.sh"
 
 [tasks.test]
-description = "Run tests with mise python"
-run = "python3 -m unittest discover -s tests"
+description = "Run tests with uv"
+run = "uv run python -m unittest discover -s tests"
 
 [tasks.cli]
-description = "Run CLI"
-run = "python3 -m keybind_dump"
+description = "Run CLI with uv"
+run = "uv run keybind-dump"

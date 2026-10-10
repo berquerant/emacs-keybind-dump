@@ -9,7 +9,6 @@ import signal
 import sys
 from typing import List, Optional
 
-from keybind_dump.mermaid import generate_mermaid_venn
 from keybind_dump.models import KeyBinding, KeybindCollection
 from keybind_dump.stats import (
     keymap_duplicate_stats,
@@ -114,17 +113,6 @@ def cmd_search(args: argparse.Namespace) -> None:
             print(f"[{b.sequence}] {b.keymap} -> {b.command}")
 
 
-def cmd_mermaid(args: argparse.Namespace) -> None:
-    collection = _load_collection(args.input)
-    target_kms = args.keymap if args.keymap else None
-    chart = generate_mermaid_venn(
-        collection,
-        target_keymaps=target_kms,
-        max_items_per_group=args.max_items,
-    )
-    print(chart)
-
-
 def main() -> None:
     # Handle broken pipe smoothly when stdout is closed early (e.g. piped to head)
     if hasattr(signal, "SIGPIPE"):
@@ -132,7 +120,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="keybind-dump",
-        description="Emacs keybinding analyzer, stats, query, and Venn-like Mermaid visualizer",
+        description="Emacs keybinding analyzer, stats, query, and search tool",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -174,13 +162,6 @@ def main() -> None:
     p_search.add_argument("--command", help="Exact command name")
     p_search.add_argument("--format", choices=["text", "json"], default="text")
     p_search.set_defaults(func=cmd_search)
-
-    # mermaid
-    p_mermaid = subparsers.add_parser("mermaid", help="Generate Venn-like Mermaid diagram")
-    p_mermaid.add_argument("input", nargs="?", default="-", help="Input JSONL file or - for stdin")
-    p_mermaid.add_argument("--keymap", action="append", help="Specific keymap(s) to include")
-    p_mermaid.add_argument("--max-items", type=int, default=30, help="Max keybindings to show per group")
-    p_mermaid.set_defaults(func=cmd_mermaid)
 
     args = parser.parse_args()
     try:

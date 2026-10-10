@@ -1,6 +1,6 @@
 # emacs-keybind-dump
 
-Dump, analyze, filter, and visualize Emacs keybindings across keymaps.
+Dump, analyze, filter, and search Emacs keybindings across keymaps.
 
 ## Features
 
@@ -14,17 +14,15 @@ Dump, analyze, filter, and visualize Emacs keybindings across keymaps.
   - Regex filter on sequence, keymap, or command.
   - Exact query on sequence, keymap, or command.
   - Duplicate-only filtering.
-- **Mermaid Venn Visualization**:
-  - Generates Mermaid flowchart syntax representing keymaps and their shared intersections.
 
 ## Setup & Requirements
 
 - Emacs (>= 27.x)
-- [mise-en-place](https://mise.jdx.dev/) (manages Python 3.14)
+- [mise-en-place](https://mise.jdx.dev/) (manages Python 3.14 & [uv](https://docs.astral.sh/uv/))
 
 ```bash
 mise run dump       # Dump keybindings to JSONL stdout
-mise run test       # Run test suite with mise's Python
+mise run test       # Run test suite with uv
 ```
 
 ## Usage
@@ -35,6 +33,15 @@ mise run test       # Run test suite with mise's Python
 ./bin/dump.sh > keybindings.jsonl
 # or via mise
 mise run dump > keybindings.jsonl
+
+# Specify custom init directory (loads DIR/init.el)
+./bin/dump.sh -d ~/.config/emacs > keybindings.jsonl
+
+# Specify custom init file
+./bin/dump.sh -i /path/to/custom-init.el > keybindings.jsonl
+
+# Or via environment variables
+EMACS_INIT_DIR=~/.config/emacs ./bin/dump.sh > keybindings.jsonl
 ```
 
 ### 2. Transform to `{sequence: {keymap: command}}`
@@ -66,12 +73,4 @@ mise run cli -- transform keybindings.jsonl
 
 # Filter by regex
 ./bin/keybind-dump filter keybindings.jsonl --keymap-regex "Buffer-menu" --format json
-```
-
-### 6. Mermaid Venn-like Visualization
-
-```bash
-./bin/keybind-dump mermaid keybindings.jsonl \
-  --keymap Buffer-menu-mode-map \
-  --keymap tabulated-list-mode-map
 ```

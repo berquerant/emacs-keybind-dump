@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from keybind_dump.models import KeyBinding, KeybindCollection
 from keybind_dump.stats import sequence_duplicate_stats, keymap_duplicate_stats
-from keybind_dump.mermaid import generate_mermaid_venn
 
 
 class TestKeybindCollectionTableDriven(unittest.TestCase):
@@ -188,53 +187,6 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
                 self.assertIsNotNone(stat)
                 self.assertEqual(stat.total_duplicate_score, c["expected_score"])
                 self.assertEqual(stat.unique_bindings_count, c["expected_bindings"])
-
-    def test_mermaid_generation_table_driven(self):
-        cases = [
-            {
-                "name": "default options includes all maps and escaped chars",
-                "kwargs": {},
-                "expected_contains": [
-                    "flowchart TD",
-                    "subgraph km_global_map",
-                    "Shared / Intersecting Keybindings",
-                    "&quot;",       # quote escaped
-                    "&#91;test&#93;", # brackets escaped
-                ],
-                "expected_not_contains": [],
-            },
-            {
-                "name": "filter target_keymaps excludes unselected maps",
-                "kwargs": {"target_keymaps": ["dired-mode-map", "help-mode-map"]},
-                "expected_contains": [
-                    "subgraph km_dired_mode_map",
-                    "subgraph km_help_mode_map",
-                    "dired-mode-map ∩ help-mode-map",
-                ],
-                "expected_not_contains": [
-                    "subgraph km_global_map",
-                    "subgraph km_quote_mode_map",
-                ],
-            },
-            {
-                "name": "truncation threshold triggers 'and X more'",
-                "kwargs": {
-                    "target_keymaps": ["dired-mode-map", "help-mode-map"],
-                    "max_items_per_group": 1,
-                },
-                "expected_contains": [
-                    "<b>Intersection",
-                ],
-                "expected_not_contains": [],
-            },
-        ]
-        for c in cases:
-            with self.subTest(c["name"]):
-                chart = generate_mermaid_venn(self.coll, **c["kwargs"])
-                for expected in c["expected_contains"]:
-                    self.assertIn(expected, chart)
-                for not_expected in c["expected_not_contains"]:
-                    self.assertNotIn(not_expected, chart)
 
 
 if __name__ == "__main__":
