@@ -354,6 +354,142 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
         filtered = self.coll.filter(sequence_pattern=combined_seq)
         self.assertEqual(set(filtered.to_nested_dict().keys()), {"C-x C-f", "C-x C-s", "q"})
 
+    def test_models_additional_coverage(self):
+        from keybind_dump.models import KeyBinding
+
+        binding = KeyBinding(sequence="C-c a", keymap="org-mode-map", command="org-agenda")
+        self.assertEqual(
+            binding.to_dict(),
+            {"sequence": "C-c a", "keymap": "org-mode-map", "command": "org-agenda"},
+        )
+
+        all_cmds = self.coll.get_all_commands()
+        self.assertIn("find-file", all_cmds)
+        self.assertIn("quit-window", all_cmds)
+
+        dups = self.coll.duplicates()
+        self.assertIn("C-x C-f", dups)
+        self.assertIn("q", dups)
+        self.assertNotIn("C-x C-s", dups)
+
+    def test_format_stats_keymap_tsv(self):
+        from keybind_dump.formatters import format_stats
+
+        # Test tsv output when target="keymap" exclusively
+        tsv_out = format_stats(self.coll, target="keymap", fmt="tsv", min_count=1, limit=None)
+        lines = tsv_out.strip().split("\n")
+        self.assertEqual(
+            lines[0],
+            "keymap\ttotal_bindings\texclusive_bindings\tshared_bindings\tconflict_rate\ttotal_duplicate_score\ttop_overlaps",
+        )
+        self.assertGreater(len(lines), 1)
+
+    def test_cli_load_collection_sources(self):
+        import io
+        import tempfile
+        from unittest.mock import patch
+
+        from keybind_dump.cli import _load_collection
+
+        # 1. From a regular JSONL file
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
+            f.write('{"sequence": "C-z", "keymap": "global-map", "command": "suspend-frame"}\n')
+            temp_path = f.name
+
+        try:
+            coll = _load_collection(file_path=temp_path)
+            self.assertEqual(coll.get_all_sequences(), ["C-z"])
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+        # 2. From standard input (file_path="-" or stdin piped)
+        mock_stdin = io.StringIO('{"sequence": "C-a", "keymap": "global-map", "command": "move-beginning-of-line"}\n')
+        with patch("sys.stdin", mock_stdin):
+            mock_stdin.isatty = lambda: False  # type: ignore[method-assign]
+            coll_stdin = _load_collection(file_path="-")
+            self.assertEqual(coll_stdin.get_all_sequences(), ["C-a"])
+
+        # 3. Direct dump execution via iter_dump mock
+        with patch("keybind_dump.cli.iter_dump") as mock_iter:
+            mock_iter.return_value = ['{"sequence": "C-b", "keymap": "k", "command": "c"}\n']
+            coll_dump = _load_collection(file_path=None, dump=True)
+            self.assertEqual(coll_dump.get_all_sequences(), ["C-b"])
+            mock_iter.assert_called_once()
+
+    def test_cli_run_cli_output_file_and_stdout(self):
+        import io
+        import tempfile
+        from unittest.mock import patch
+
+        from keybind_dump.cli import run_cli
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
+            f.write('{"sequence": "C-x C-f", "keymap": "global-map", "command": "find-file"}\n')
+            f.write('{"sequence": "C-x C-s", "keymap": "global-map", "command": "save-buffer"}\n')
+            in_path = f.name
+
+        out_path = in_path + ".out.json"
+        try:
+            # Run with file output
+            run_cli([in_path, "-f", "json", "-o", out_path])
+            self.assertTrue(Path(out_path).exists())
+            content = json.loads(Path(out_path).read_text(encoding="utf-8"))
+            self.assertIn("C-x C-f", content)
+
+            # Run with stdout output
+            mock_stdout = io.StringIO()
+            with patch("sys.stdout", mock_stdout):
+                run_cli([in_path, "-s", "C-f", "-f", "text"])
+            self.assertIn("find-file", mock_stdout.getvalue())
+            self.assertNotIn("save-buffer", mock_stdout.getvalue())
+        finally:
+            Path(in_path).unlink(missing_ok=True)
+            Path(out_path).unlink(missing_ok=True)
+
+    def test_dumper_run_dump_and_iter_dump_error(self):
+        import subprocess
+        from unittest.mock import MagicMock, patch
+
+        from keybind_dump.dumper import iter_dump, run_dump
+
+        # Test run_dump verbose vs non-verbose
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stderr="")
+            rc = run_dump(quick=True, verbose=True)
+            self.assertEqual(rc, 0)
+            mock_run.assert_called_once()
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1, stderr="Error occurred")
+            with patch("sys.stderr.write") as mock_stderr:
+                rc = run_dump(quick=True, verbose=False)
+                self.assertEqual(rc, 1)
+                mock_stderr.assert_called_with("Error occurred")
+
+        # Test iter_dump error exit raising RuntimeError
+        proc_mock = MagicMock()
+        proc_mock.stdout = ["line1\n", "line2\n"]
+        proc_mock.stderr = ["Something failed\n"]
+        proc_mock.poll.return_value = 1
+        proc_mock.wait.return_value = 1
+
+        with (
+            patch("subprocess.Popen", return_value=proc_mock),
+            patch("sys.stderr.write") as mock_err_write,
+        ):
+            gen = iter_dump(quick=True)
+            with self.assertRaises(RuntimeError):
+                list(gen)
+            mock_err_write.assert_called_with("Something failed\n")
+
+    def test_dumper_get_elisp_path_not_found(self):
+        from unittest.mock import patch
+
+        from keybind_dump.dumper import get_elisp_path
+
+        with patch("pathlib.Path.is_file", return_value=False), self.assertRaises(FileNotFoundError):
+            get_elisp_path()
+
 
 if __name__ == "__main__":
     unittest.main()
