@@ -29,7 +29,16 @@ def _load_collection(
     emacs_bin: Optional[str] = None,
     verbose: bool = False,
 ) -> KeybindCollection:
-    """Load KeybindCollection from file, stdin, or direct Emacs dump."""
+    """Load KeybindCollection from a file, standard input, or direct Emacs execution.
+
+    Loading priority:
+    1. If `dump=True` or (`file_path` is None and standard input is a terminal TTY),
+       launches Emacs in batch mode to dump keybindings dynamically.
+    2. If `file_path` is specified and not '-', reads from the designated JSONL file.
+    3. If `file_path` is '-' or omitted while standard input is piped/redirected,
+       reads JSON Lines from `sys.stdin`.
+    4. Otherwise, falls back to direct Emacs execution.
+    """
     # 1. If explicit dump requested or (input is not specified and stdin is interactive)
     should_dump = dump or (file_path is None and sys.stdin.isatty())
 
@@ -68,7 +77,15 @@ def _format_stats(
     min_count: int,
     limit: Optional[int],
 ) -> str:
-    """Format duplicate statistics as text, json, or tsv."""
+    """Format duplicate statistics as text, json, or tsv.
+
+    Arguments:
+        collection: The keybinding collection to calculate metrics from.
+        target: Target metrics domain ('sequence', 'keymap', or 'both').
+        fmt: Output format representation ('text', 'json', or 'tsv').
+        min_count: Minimum occurrence threshold for sequence duplication reporting.
+        limit: Maximum number of rows/items to report.
+    """
     summary = overall_summary_stats(collection)
 
     seq_stats = []
@@ -235,7 +252,16 @@ def _format_collection(
     duplicates_only: bool,
     limit: Optional[int],
 ) -> str:
-    """Format keybinding collection as text, tsv, json, or jsonl."""
+    """Format keybinding collection as text, tsv, json, or jsonl.
+
+    Arguments:
+        collection: The filtered keybinding collection to output.
+        fmt: Target serialization format ('text', 'tsv', 'json', or 'jsonl').
+        target_keymaps: Specific keymaps to extract as columns in TSV matrix mode.
+        none_value: Placeholder value for missing keybindings in TSV matrix.
+        duplicates_only: Filter flag indicating only sequences with >=2 keymaps.
+        limit: Maximum number of rows/lines to output.
+    """
     if fmt == "tsv":
         return collection.to_tsv(
             target_keymaps=target_keymaps,

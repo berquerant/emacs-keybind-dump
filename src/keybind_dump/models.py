@@ -25,7 +25,12 @@ class KeyBinding:
 
 
 class KeybindCollection:
-    """Manages raw and nested keybinding mappings."""
+    """Manages raw and nested keybinding mappings across keymaps.
+
+    Underlying storage is an inverted index keyed by sequence:
+    `{sequence: {keymap: command}}`.
+    This enables O(1) sequence lookups and efficient duplicate/overlap detection.
+    """
 
     def __init__(self, bindings: Optional[Iterable[KeyBinding]] = None) -> None:
         # nested structure: {sequence: {keymap: command}}
@@ -135,10 +140,18 @@ class KeybindCollection:
         none_value: str = "None",
         duplicates_only: bool = False,
     ) -> str:
-        """Export keybinding matrix as TSV.
+        """Export keybinding matrix as TSV format.
 
-        - Header: keybind, followed by keymap names.
-        - Rows: keybind value, followed by command for each keymap (or none_value if missing).
+        Structure:
+        - Header: `keybind` column followed by each selected keymap name.
+        - Rows: Each row represents a unique key sequence. Column values correspond
+          to the command bound in that keymap, or `none_value` if unbound.
+
+        Arguments:
+            target_keymaps: Ordered subset of keymaps to include as matrix columns.
+                Defaults to all discovered keymaps in alphabetical order.
+            none_value: Placeholder string for unmapped keybind entries (default: "None").
+            duplicates_only: If True, only rows bound in >=2 keymaps are included.
         """
         if target_keymaps:
             keymaps = list(target_keymaps)

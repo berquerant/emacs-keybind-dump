@@ -12,7 +12,10 @@
 (require 'cl-lib)
 
 (defun keybind-dump--extract-keymap (map-name keymap)
-  "Extract leaf bindings from KEYMAP named MAP-NAME."
+  "Extract leaf bindings from KEYMAP named MAP-NAME.
+
+Recursively traverses nested keymaps up to a prefix depth of 8 vectors.
+Tracks `visited-maps' to prevent infinite loops caused by circular keymap references."
   (let ((items nil)
         (visited-maps nil))
     (cl-labels ((walk (km prefix-vec)
