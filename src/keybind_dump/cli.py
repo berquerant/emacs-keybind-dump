@@ -9,6 +9,7 @@ import json
 import os
 import signal
 import sys
+from typing import Any
 
 from keybind_dump.dumper import iter_dump
 from keybind_dump.models import KeybindCollection
@@ -100,7 +101,7 @@ def _format_stats(
             km_stats = km_stats[:limit]
 
     if fmt == "json":
-        data = {
+        data: dict[str, Any] = {
             "summary": {
                 "total_records": summary.total_records,
                 "unique_sequences": summary.unique_sequences,

@@ -98,10 +98,10 @@ def run_dump(
         extra_args=extra_args,
     )
     if verbose:
-        proc = subprocess.run(
-            cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr, check=False
+        res_verbose = subprocess.run(
+            cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr, check=False, text=True
         )
-        return proc.returncode
+        return res_verbose.returncode
 
     proc = subprocess.run(
         cmd, stdout=stdout or sys.stdout, stderr=subprocess.PIPE, text=True, check=False
@@ -164,17 +164,22 @@ def iter_dump(
         if proc.stdout:
             yield from proc.stdout
     finally:
-        if proc.poll() is None:
+        rc = proc.poll()
+        if rc is None:
+            # If still running (e.g. generator closed early by caller)
             proc.terminate()
             try:
-                proc.wait(timeout=2)
+                rc = proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 proc.kill()
+                rc = proc.wait()
+        else:
+            rc = proc.wait()
+
         if reader_thread and reader_thread.is_alive():
             reader_thread.join(timeout=1)
 
-    rc = proc.wait()
-    if rc != 0:
-        if err_chunks:
-            sys.stderr.write("".join(err_chunks))
-        raise RuntimeError(f"Emacs batch dump exited with error code {rc}")
+        if rc != 0:
+            if err_chunks:
+                sys.stderr.write("".join(err_chunks))
+            raise RuntimeError(f"Emacs batch dump exited with error code {rc}")

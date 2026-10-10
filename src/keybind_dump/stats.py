@@ -70,7 +70,7 @@ def overall_summary_stats(collection: KeybindCollection) -> OverallSummaryStat:
     total_records = sum(len(km_map) for km_map in nested.values())
     unique_sequences = len(nested)
 
-    keymaps = set()
+    keymaps: set[str] = set()
     shared_sequences = 0
     for km_map in nested.values():
         keymaps.update(km_map.keys())
