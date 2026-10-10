@@ -44,6 +44,9 @@ mise run test
 
 # Run linter and type checker
 mise run lint
+
+# Release a new version (bumps pyproject.toml, uv.lock, commits, tags, and pushes)
+mise run release 0.2.0
 ```
 
 ---
