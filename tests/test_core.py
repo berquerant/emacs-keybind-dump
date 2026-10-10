@@ -188,6 +188,113 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
                 self.assertEqual(stat.total_duplicate_score, c["expected_score"])
                 self.assertEqual(stat.unique_bindings_count, c["expected_bindings"])
 
+    def test_tsv_generation_table_driven(self):
+        cases = [
+            {
+                "name": "default options includes all keymaps header and rows",
+                "kwargs": {},
+                "expected_rows": [
+                    ["keybind", "dired-mode-map", "global-map", "help-mode-map", "quote-mode-map", "special-mode-map"],
+                    ['""""', "None", "None", "None", "self-insert-command", "None"],
+                    ["<menu-bar> [test]", "None", "None", "None", "None", "test-cmd"],
+                    ["C-x C-f", "dired-find-file", "find-file", "None", "None", "None"],
+                    ["C-x C-s", "None", "save-buffer", "None", "None", "None"],
+                    ["h", "None", "None", "describe-mode", "None", "None"],
+                    ["q", "quit-window", "None", "quit-window", "None", "None"],
+                ],
+            },
+            {
+                "name": "filter target_keymaps limits columns to specified keymaps",
+                "kwargs": {"target_keymaps": ["global-map", "dired-mode-map"]},
+                "expected_rows": [
+                    ["keybind", "global-map", "dired-mode-map"],
+                    ["C-x C-f", "find-file", "dired-find-file"],
+                    ["C-x C-s", "save-buffer", "None"],
+                    ["q", "None", "quit-window"],
+                ],
+            },
+            {
+                "name": "duplicates_only includes only multi-keymap sequences",
+                "kwargs": {"duplicates_only": True},
+                "expected_rows": [
+                    ["keybind", "dired-mode-map", "global-map", "help-mode-map", "quote-mode-map", "special-mode-map"],
+                    ["C-x C-f", "dired-find-file", "find-file", "None", "None", "None"],
+                    ["q", "quit-window", "None", "quit-window", "None", "None"],
+                ],
+            },
+            {
+                "name": "custom none_value is respected",
+                "kwargs": {"target_keymaps": ["global-map", "dired-mode-map"], "none_value": "-"},
+                "expected_rows": [
+                    ["keybind", "global-map", "dired-mode-map"],
+                    ["C-x C-s", "save-buffer", "-"],
+                    ["q", "-", "quit-window"],
+                ],
+            },
+        ]
+        for c in cases:
+            with self.subTest(c["name"]):
+                tsv_str = self.coll.to_tsv(**c["kwargs"])
+                lines = [line.split("\t") for line in tsv_str.strip().split("\n")]
+                for expected_row in c["expected_rows"]:
+                    self.assertIn(expected_row, lines)
+
+    def test_cli_format_stats(self):
+        from keybind_dump.cli import _format_stats, _format_collection
+        # JSON format stats
+        json_out = _format_stats(self.coll, target="both", fmt="json", min_count=2, limit=None)
+        data = json.loads(json_out)
+        self.assertIn("sequences", data)
+        self.assertIn("keymaps", data)
+        self.assertEqual(data["sequences"][0]["sequence"], "C-x C-f")
+
+        # TSV format stats
+        tsv_out = _format_stats(self.coll, target="sequence", fmt="tsv", min_count=2, limit=None)
+        self.assertIn("sequence\tcount\tkeymaps", tsv_out)
+
+        # Text format stats
+        text_out = _format_stats(self.coll, target="both", fmt="text", min_count=2, limit=None)
+        self.assertIn("=== Sequence Duplicate Stats ===", text_out)
+        self.assertIn("=== Keymap Total Duplicate Score Stats ===", text_out)
+
+    def test_cli_format_collection(self):
+        from keybind_dump.cli import _format_collection
+        # JSON format
+        json_out = _format_collection(self.coll, fmt="json", target_keymaps=None, none_value="None", duplicates_only=False, limit=None)
+        data = json.loads(json_out)
+        self.assertIn("C-x C-f", data)
+
+        # JSONL format
+        jsonl_out = _format_collection(self.coll, fmt="jsonl", target_keymaps=None, none_value="None", duplicates_only=False, limit=2)
+        lines = [json.loads(line) for line in jsonl_out.strip().split("\n")]
+        self.assertEqual(len(lines), 2)
+
+        # Text format
+        text_out = _format_collection(self.coll, fmt="text", target_keymaps=None, none_value="None", duplicates_only=False, limit=None)
+        self.assertIn("[C-x C-f] dired-mode-map -> dired-find-file", text_out)
+
+    def test_dumper_build_emacs_cmd(self):
+        from keybind_dump.dumper import build_emacs_cmd
+
+        # 1. Quick mode (-Q)
+        cmd_quick = build_emacs_cmd(quick=True)
+        self.assertIn("-Q", cmd_quick)
+        self.assertIn("keybind-dump-jsonl", cmd_quick)
+
+        # 2. Neither init_dir nor init_file -> default -Q
+        cmd_default = build_emacs_cmd()
+        self.assertIn("-Q", cmd_default)
+
+        # 3. With init_dir
+        cmd_dir = build_emacs_cmd(init_dir="/tmp/test-emacs.d")
+        self.assertIn("--init-directory", cmd_dir)
+        self.assertNotIn("-Q", cmd_dir)
+
+        # 4. With init_file
+        cmd_file = build_emacs_cmd(init_file="/tmp/test-init.el")
+        self.assertIn("-l", cmd_file)
+        self.assertNotIn("-Q", cmd_file)
+
 
 if __name__ == "__main__":
     unittest.main()

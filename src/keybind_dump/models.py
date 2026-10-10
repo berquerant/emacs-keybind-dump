@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 from dataclasses import dataclass
@@ -126,3 +128,42 @@ class KeybindCollection:
                     continue
                 results.append(KeyBinding(sequence=seq, keymap=km, command=cmd))
         return sorted(results, key=lambda b: (b.sequence, b.keymap, b.command))
+
+    def to_tsv(
+        self,
+        target_keymaps: Optional[list[str]] = None,
+        none_value: str = "None",
+        duplicates_only: bool = False,
+    ) -> str:
+        """Export keybinding matrix as TSV.
+
+        - Header: keybind, followed by keymap names.
+        - Rows: keybind value, followed by command for each keymap (or none_value if missing).
+        """
+        if target_keymaps:
+            keymaps = list(target_keymaps)
+        else:
+            keymaps = self.get_all_keymaps()
+
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+
+        # Header row
+        writer.writerow(["keybind", *keymaps])
+
+        # Data rows
+        for seq in self.get_all_sequences():
+            km_map = self._seq_map[seq]
+            if duplicates_only and len(km_map) <= 1:
+                continue
+
+            # If target_keymaps are filtered, check if at least one target keymap is present when filtering
+            if target_keymaps and not any(km in km_map for km in target_keymaps):
+                continue
+
+            row = [seq]
+            for km in keymaps:
+                row.append(km_map.get(km, none_value))
+            writer.writerow(row)
+
+        return output.getvalue()
