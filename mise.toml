@@ -21,9 +21,21 @@ run = "uv run python -m unittest tests/test_core.py"
 description = "Run E2E build and install tests with uv"
 run = "uv run python -m unittest tests/test_e2e_install.py"
 
+[tasks."lint:ruff"]
+description = "Run ruff linter with uv"
+run = "uv run ruff check src tests scripts"
+
+[tasks."lint:mypy"]
+description = "Run mypy type checker with uv"
+run = "uv run mypy src tests scripts"
+
 [tasks.lint]
-description = "Run linter and type checker with uv"
-run = "uv run ruff check src tests scripts && uv run mypy src tests scripts"
+description = "Run all linters and type checkers with uv"
+depends = ["lint:ruff", "lint:mypy"]
+
+[tasks.ci]
+description = "Run all checks and tests (for CI and pre-commit)"
+depends = ["lint", "test"]
 
 [tasks.cli]
 description = "Run CLI with uv"

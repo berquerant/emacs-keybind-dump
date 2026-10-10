@@ -86,7 +86,11 @@ class TestE2EInstallAndRun(unittest.TestCase):
             f"keybind-dump failed with stderr:\n{res.stderr}",
         )
         lines = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-        self.assertGreaterEqual(len(lines), 1)
+        self.assertGreaterEqual(
+            len(lines),
+            1,
+            f"Expected at least 1 line. rc={res.returncode}, stdout={res.stdout!r}, stderr={res.stderr!r}",
+        )
 
         # Ensure valid JSON output
         for line in lines:

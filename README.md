@@ -48,8 +48,11 @@ mise run test:unit
 # Run E2E build & pip install tests
 mise run test:e2e
 
-# Run linter and type checker
+# Run all linters and type checkers (depends: lint:ruff, lint:mypy)
 mise run lint
+
+# Run all checks and tests (CI tasks)
+mise run ci
 
 # Release a new version (bumps pyproject.toml, uv.lock, commits, tags, and pushes)
 mise run release 0.2.0

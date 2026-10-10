@@ -39,7 +39,14 @@ def _load_collection(
     4. Otherwise, falls back to direct Emacs execution.
     """
     # 1. Direct Emacs batch dump execution
-    if dump or (file_path is None and sys.stdin.isatty()):
+    is_dump_requested = (
+        dump
+        or quick
+        or init_file is not None
+        or eval_before_dump
+        or load_before_dump
+    )
+    if file_path is None and (is_dump_requested or sys.stdin.isatty()):
         lines = iter_dump(
             init_dir=init_dir,
             init_file=init_file,
@@ -57,7 +64,7 @@ def _load_collection(
             return KeybindCollection.from_jsonl(f)
 
     # 3. Standard input (piped)
-    if not sys.stdin.isatty():
+    if file_path == "-" or not sys.stdin.isatty():
         return KeybindCollection.from_jsonl(sys.stdin)
 
     # 4. Interactive fallback to direct dump
