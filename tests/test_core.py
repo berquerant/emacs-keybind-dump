@@ -314,6 +314,22 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
         self.assertIn("-l", cmd_file)
         self.assertNotIn("-Q", cmd_file)
 
+        # 5. With eval_before_dump and load_before_dump
+        cmd_hooks = build_emacs_cmd(
+            eval_before_dump=["(require 'org)", "(message \"loaded\")"],
+            load_before_dump=["/tmp/setup.el"],
+        )
+        self.assertIn("--eval", cmd_hooks)
+        self.assertIn("(require 'org)", cmd_hooks)
+        self.assertIn("/tmp/setup.el", cmd_hooks)
+
+        # Ensure keybind-dump.el is loaded before user hooks/evals
+        idx_pkg = next(i for i, arg in enumerate(cmd_hooks) if "keybind-dump.el" in arg)
+        idx_load = cmd_hooks.index("/tmp/setup.el")
+        idx_eval = cmd_hooks.index("(require 'org)")
+        self.assertLess(idx_pkg, idx_load)
+        self.assertLess(idx_pkg, idx_eval)
+
 
 if __name__ == "__main__":
     unittest.main()

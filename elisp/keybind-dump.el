@@ -49,8 +49,17 @@ between parent and child keymaps, or self-referential mode maps."
       (walk keymap []))
     (nreverse items)))
 
+(defcustom keybind-dump-before-dump-hook nil
+  "Hook run before extracting and dumping keybindings.
+Functions in this hook can load additional packages, require modes,
+or set up keymaps prior to scanning."
+  :type 'hook
+  :group 'keybind-dump)
+
 (defun keybind-dump-all-keymaps ()
-  "Collect keybindings from `global-map' and all known *-map / *-mode-map keymaps."
+  "Collect keybindings from `global-map' and all known *-map / *-mode-map keymaps.
+Runs `keybind-dump-before-dump-hook' before scanning."
+  (run-hooks 'keybind-dump-before-dump-hook)
   (let ((map-entries nil)
         (result nil))
     (push (cons "global-map" (current-global-map)) map-entries)

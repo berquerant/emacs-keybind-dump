@@ -25,6 +25,8 @@ def _load_collection(
     quick: bool = False,
     emacs_bin: str | None = None,
     verbose: bool = False,
+    eval_before_dump: Sequence[str] | None = None,
+    load_before_dump: Sequence[str] | None = None,
 ) -> KeybindCollection:
     """Load KeybindCollection from a file, standard input, or direct Emacs execution.
 
@@ -44,6 +46,8 @@ def _load_collection(
             quick=quick,
             emacs_bin=emacs_bin,
             verbose=verbose,
+            eval_before_dump=eval_before_dump,
+            load_before_dump=load_before_dump,
         )
         return KeybindCollection.from_jsonl(lines)
 
@@ -63,6 +67,8 @@ def _load_collection(
         quick=quick,
         emacs_bin=emacs_bin,
         verbose=verbose,
+        eval_before_dump=eval_before_dump,
+        load_before_dump=load_before_dump,
     )
     return KeybindCollection.from_jsonl(lines)
 
@@ -111,6 +117,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--emacs-bin",
         default=os.environ.get("EMACS_BIN", "emacs"),
         help="Path to emacs executable (default: $EMACS_BIN or emacs)",
+    )
+    g_dump.add_argument(
+        "--eval",
+        "--eval-before-dump",
+        action="append",
+        dest="eval_before_dump",
+        help="Evaluate Elisp expression before dumping keybindings (can be specified multiple times)",
+    )
+    g_dump.add_argument(
+        "--load",
+        "--load-before-dump",
+        action="append",
+        dest="load_before_dump",
+        help="Load Elisp file before dumping keybindings (can be specified multiple times)",
     )
     g_dump.add_argument(
         "-v",
@@ -181,6 +201,8 @@ def run_cli(args_list: Sequence[str] | None = None) -> None:
         quick=args.quick,
         emacs_bin=args.emacs_bin,
         verbose=args.verbose,
+        eval_before_dump=args.eval_before_dump,
+        load_before_dump=args.load_before_dump,
     )
 
     # Combine keymap patterns if multiple specified (e.g. "^(km1|km2)$")

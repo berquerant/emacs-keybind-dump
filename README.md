@@ -72,6 +72,12 @@ keybind-dump -Q
 keybind-dump -d ~/.config/emacs
 keybind-dump -i ~/.emacs.d/init.el
 
+# Require specific modes or packages before dumping so their keymaps are loaded
+keybind-dump --eval "(require 'org)" --eval "(require 'markdown-mode)"
+
+# Load a custom setup script before dumping (can also register `keybind-dump-before-dump-hook`)
+keybind-dump --load setup-modes.el
+
 # Inspect Emacs stderr output (useful for debugging init file warnings)
 keybind-dump -v
 ```
@@ -168,6 +174,8 @@ keybind-dump --stats sequence -f tsv
 | `-i, --init-file FILE` | Dump | Explicit Emacs init file to load. Defaults to `$EMACS_INIT_FILE`. |
 | `-Q, --quick` | Dump | Run Emacs with `-Q` (quick mode, skipping user configuration). |
 | `--emacs-bin BIN` | Dump | Path to `emacs` binary (defaults to `$EMACS_BIN` or `emacs`). |
+| `--eval, --eval-before-dump EXPR` | Dump | Evaluate Elisp expression before dumping (e.g. `(require 'org)`). Can be repeated. |
+| `--load, --load-before-dump FILE` | Dump | Load Elisp file before dumping. Can be repeated. |
 | `-v, --verbose` | Dump | Stream Emacs `stderr` even when execution succeeds. |
 | `-D, --duplicates-only` | Filter | Include only key sequences defined in 2 or more keymaps. |
 | `-s, --sequence PAT` | Filter | Regular expression filter for key sequences (e.g. `^C-c`). |

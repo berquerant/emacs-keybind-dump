@@ -37,6 +37,8 @@ def build_emacs_cmd(
     quick: bool = False,
     emacs_bin: str | None = None,
     extra_args: Sequence[str] | None = None,
+    eval_before_dump: Sequence[str] | None = None,
+    load_before_dump: Sequence[str] | None = None,
 ) -> list[str]:
     """Build the command list to run Emacs in batch mode.
 
@@ -47,6 +49,8 @@ def build_emacs_cmd(
         quick: If True, or if neither `init_dir` nor `init_file` is specified, runs with `-Q`.
         emacs_bin: Custom Emacs binary executable name or path (defaults to $EMACS_BIN or 'emacs').
         extra_args: Optional list of additional CLI flags passed to Emacs.
+        eval_before_dump: Optional sequence of Elisp expressions to evaluate before dumping.
+        load_before_dump: Optional sequence of Elisp files to load before dumping.
     """
     bin_name = emacs_bin or os.environ.get("EMACS_BIN", "emacs")
     cmd = [bin_name, "--batch"]
@@ -71,7 +75,19 @@ def build_emacs_cmd(
         cmd.extend(extra_args)
 
     elisp_file = get_elisp_path()
-    cmd.extend(["-l", str(elisp_file), "-f", "keybind-dump-jsonl"])
+    cmd.extend(["-l", str(elisp_file)])
+
+    # Execute user hooks/files after loading keybind-dump.el (so hook variable is available)
+    if load_before_dump:
+        for f in load_before_dump:
+            abs_load = os.path.abspath(os.path.expanduser(f))
+            cmd.extend(["-l", abs_load])
+
+    if eval_before_dump:
+        for expr in eval_before_dump:
+            cmd.extend(["--eval", expr])
+
+    cmd.extend(["-f", "keybind-dump-jsonl"])
     return cmd
 
 
@@ -81,6 +97,8 @@ def run_dump(
     quick: bool = False,
     emacs_bin: str | None = None,
     extra_args: Sequence[str] | None = None,
+    eval_before_dump: Sequence[str] | None = None,
+    load_before_dump: Sequence[str] | None = None,
     verbose: bool = False,
     stdout=None,
     stderr=None,
@@ -96,6 +114,8 @@ def run_dump(
         quick=quick,
         emacs_bin=emacs_bin,
         extra_args=extra_args,
+        eval_before_dump=eval_before_dump,
+        load_before_dump=load_before_dump,
     )
     if verbose:
         res_verbose = subprocess.run(
@@ -117,6 +137,8 @@ def iter_dump(
     quick: bool = False,
     emacs_bin: str | None = None,
     extra_args: Sequence[str] | None = None,
+    eval_before_dump: Sequence[str] | None = None,
+    load_before_dump: Sequence[str] | None = None,
     verbose: bool = False,
 ):
     """Run Emacs in batch mode and yield dumped JSON Lines incrementally.
@@ -143,6 +165,8 @@ def iter_dump(
         quick=quick,
         emacs_bin=emacs_bin,
         extra_args=extra_args,
+        eval_before_dump=eval_before_dump,
+        load_before_dump=load_before_dump,
     )
     proc = subprocess.Popen(
         cmd,
