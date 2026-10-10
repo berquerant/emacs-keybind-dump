@@ -1,0 +1,46 @@
+[tools]
+python = "3.14"
+uv = "0.12.23"
+
+[env]
+PYTHONPATH = "src"
+
+[tasks.dump]
+description = "Dump Emacs keybindings to JSONL"
+run = "uv run keybind-dump -f jsonl"
+
+[tasks.test]
+description = "Run all tests (unit and E2E) with uv"
+run = "uv run python -m unittest discover -s tests"
+
+[tasks."test:unit"]
+description = "Run fast unit tests with uv"
+run = "uv run python -m unittest tests/test_core.py"
+
+[tasks."test:e2e"]
+description = "Run E2E build and install tests with uv"
+run = "uv run python -m unittest tests/test_e2e_install.py"
+
+[tasks."lint:ruff"]
+description = "Run ruff linter with uv"
+run = "uv run ruff check src tests scripts"
+
+[tasks."lint:mypy"]
+description = "Run mypy type checker with uv"
+run = "uv run mypy src tests scripts"
+
+[tasks.lint]
+description = "Run all linters and type checkers with uv"
+depends = ["lint:ruff", "lint:mypy"]
+
+[tasks.ci]
+description = "Run all checks and tests (for CI and pre-commit)"
+depends = ["lint", "test"]
+
+[tasks.cli]
+description = "Run CLI with uv"
+run = "uv run keybind-dump"
+
+[tasks.release]
+description = "Release a new version (bump pyproject.toml, uv lock, commit, and tag)"
+run = "uv run python scripts/release.py"
