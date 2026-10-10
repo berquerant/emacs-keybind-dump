@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from keybind_dump.models import KeybindCollection
@@ -137,7 +137,7 @@ def keymap_duplicate_stats(
     # overlap matrix: (kmA, kmB) -> shared count
     overlaps: dict[str, Counter[str]] = defaultdict(Counter)
 
-    for seq, km_map in nested.items():
+    for km_map in nested.values():
         kms = sorted(km_map.keys())
         is_shared = len(kms) > 1
         score = len(kms) - 1

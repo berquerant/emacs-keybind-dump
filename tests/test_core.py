@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 # Ensure src is in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from keybind_dump.models import KeyBinding, KeybindCollection
-from keybind_dump.stats import sequence_duplicate_stats, keymap_duplicate_stats
+from keybind_dump.models import KeybindCollection
+from keybind_dump.stats import keymap_duplicate_stats, sequence_duplicate_stats
 
 
 class TestKeybindCollectionTableDriven(unittest.TestCase):
@@ -248,7 +248,7 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
                     self.assertIn(expected_row, lines)
 
     def test_cli_format_stats(self):
-        from keybind_dump.cli import _format_stats, _format_collection
+        from keybind_dump.cli import _format_stats
         # JSON format stats
         json_out = _format_stats(self.coll, target="both", fmt="json", min_count=2, limit=None)
         data = json.loads(json_out)
@@ -273,10 +273,15 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
 
     def test_cli_format_collection(self):
         from keybind_dump.cli import _format_collection
-        # JSON format
+        # JSON format with and without limit
         json_out = _format_collection(self.coll, fmt="json", target_keymaps=None, none_value="None", duplicates_only=False, limit=None)
         data = json.loads(json_out)
         self.assertIn("C-x C-f", data)
+        self.assertGreater(len(data), 2)
+
+        json_out_limited = _format_collection(self.coll, fmt="json", target_keymaps=None, none_value="None", duplicates_only=False, limit=2)
+        data_limited = json.loads(json_out_limited)
+        self.assertEqual(len(data_limited), 2)
 
         # JSONL format
         jsonl_out = _format_collection(self.coll, fmt="jsonl", target_keymaps=None, none_value="None", duplicates_only=False, limit=2)

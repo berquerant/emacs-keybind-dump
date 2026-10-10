@@ -6,8 +6,8 @@ import csv
 import io
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class KeybindCollection:
     This enables O(1) sequence lookups and efficient duplicate/overlap detection.
     """
 
-    def __init__(self, bindings: Optional[Iterable[KeyBinding]] = None) -> None:
+    def __init__(self, bindings: Iterable[KeyBinding] | None = None) -> None:
         # nested structure: {sequence: {keymap: command}}
         self._seq_map: dict[str, dict[str, str]] = {}
         if bindings:
@@ -69,13 +69,13 @@ class KeybindCollection:
         return sorted(self._seq_map.keys())
 
     def get_all_keymaps(self) -> list[str]:
-        keymaps: Set[str] = set()
+        keymaps: set[str] = set()
         for km_map in self._seq_map.values():
             keymaps.update(km_map.keys())
         return sorted(keymaps)
 
     def get_all_commands(self) -> list[str]:
-        commands: Set[str] = set()
+        commands: set[str] = set()
         for km_map in self._seq_map.values():
             commands.update(km_map.values())
         return sorted(commands)
@@ -90,9 +90,9 @@ class KeybindCollection:
 
     def filter(
         self,
-        sequence_pattern: Optional[str] = None,
-        keymap_pattern: Optional[str] = None,
-        command_pattern: Optional[str] = None,
+        sequence_pattern: str | None = None,
+        keymap_pattern: str | None = None,
+        command_pattern: str | None = None,
         duplicates_only: bool = False,
     ) -> KeybindCollection:
         """Filter bindings using regular expressions and criteria."""
@@ -117,9 +117,9 @@ class KeybindCollection:
 
     def search(
         self,
-        sequence: Optional[str] = None,
-        keymap: Optional[str] = None,
-        command: Optional[str] = None,
+        sequence: str | None = None,
+        keymap: str | None = None,
+        command: str | None = None,
     ) -> list[KeyBinding]:
         """Search bindings by exact sequence, keymap, or command match."""
         results: list[KeyBinding] = []
@@ -136,7 +136,7 @@ class KeybindCollection:
 
     def to_tsv(
         self,
-        target_keymaps: Optional[list[str]] = None,
+        target_keymaps: list[str] | None = None,
         none_value: str = "None",
         duplicates_only: bool = False,
     ) -> str:

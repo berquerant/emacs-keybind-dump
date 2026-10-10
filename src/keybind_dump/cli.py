@@ -9,10 +9,9 @@ import json
 import os
 import signal
 import sys
-from typing import List, Optional
 
 from keybind_dump.dumper import iter_dump
-from keybind_dump.models import KeyBinding, KeybindCollection
+from keybind_dump.models import KeybindCollection
 from keybind_dump.stats import (
     keymap_duplicate_stats,
     overall_summary_stats,
@@ -21,12 +20,12 @@ from keybind_dump.stats import (
 
 
 def _load_collection(
-    file_path: Optional[str],
+    file_path: str | None,
     dump: bool = False,
-    init_dir: Optional[str] = None,
-    init_file: Optional[str] = None,
+    init_dir: str | None = None,
+    init_file: str | None = None,
     quick: bool = False,
-    emacs_bin: Optional[str] = None,
+    emacs_bin: str | None = None,
     verbose: bool = False,
 ) -> KeybindCollection:
     """Load KeybindCollection from a file, standard input, or direct Emacs execution.
@@ -75,7 +74,7 @@ def _format_stats(
     target: str,
     fmt: str,
     min_count: int,
-    limit: Optional[int],
+    limit: int | None,
 ) -> str:
     """Format duplicate statistics as text, json, or tsv.
 
@@ -229,9 +228,7 @@ def _format_stats(
                 lines.append(f"[{s.sequence}] in {s.count} maps ({status}): {cmd_summary}")
 
         if target in ("keymap", "both"):
-            if lines and target != "both":
-                lines.append("")
-            elif lines and target == "both":
+            if lines and target != "both" or lines and target == "both":
                 lines.append("")
             lines.append("=== Keymap Duplicate Stats ===")
             for k in km_stats:
@@ -247,10 +244,10 @@ def _format_stats(
 def _format_collection(
     collection: KeybindCollection,
     fmt: str,
-    target_keymaps: Optional[list[str]],
+    target_keymaps: list[str] | None,
     none_value: str,
     duplicates_only: bool,
-    limit: Optional[int],
+    limit: int | None,
 ) -> str:
     """Format keybinding collection as text, tsv, json, or jsonl.
 
@@ -272,6 +269,8 @@ def _format_collection(
     nested = collection.to_nested_dict()
 
     if fmt == "json":
+        if limit is not None:
+            nested = {seq: nested[seq] for seq in sorted(nested.keys())[:limit]}
         return json.dumps(nested, separators=(",", ":"), ensure_ascii=False) + "\n"
 
     elif fmt == "jsonl":

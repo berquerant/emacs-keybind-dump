@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 
 def get_elisp_path() -> Path:
@@ -32,11 +32,11 @@ def get_elisp_path() -> Path:
 
 
 def build_emacs_cmd(
-    init_dir: Optional[str] = None,
-    init_file: Optional[str] = None,
+    init_dir: str | None = None,
+    init_file: str | None = None,
     quick: bool = False,
-    emacs_bin: Optional[str] = None,
-    extra_args: Optional[Sequence[str]] = None,
+    emacs_bin: str | None = None,
+    extra_args: Sequence[str] | None = None,
 ) -> list[str]:
     """Build the command list to run Emacs in batch mode.
 
@@ -52,9 +52,7 @@ def build_emacs_cmd(
     cmd = [bin_name, "--batch"]
 
     # If quick requested, use -Q and skip loading init
-    if quick:
-        cmd.append("-Q")
-    elif not init_dir and not init_file:
+    if quick or not init_dir and not init_file:
         cmd.append("-Q")
     else:
         if init_dir:
@@ -78,11 +76,11 @@ def build_emacs_cmd(
 
 
 def run_dump(
-    init_dir: Optional[str] = None,
-    init_file: Optional[str] = None,
+    init_dir: str | None = None,
+    init_file: str | None = None,
     quick: bool = False,
-    emacs_bin: Optional[str] = None,
-    extra_args: Optional[Sequence[str]] = None,
+    emacs_bin: str | None = None,
+    extra_args: Sequence[str] | None = None,
     verbose: bool = False,
     stdout=None,
     stderr=None,
@@ -100,21 +98,25 @@ def run_dump(
         extra_args=extra_args,
     )
     if verbose:
-        proc = subprocess.run(cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr)
+        proc = subprocess.run(
+            cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr, check=False
+        )
         return proc.returncode
 
-    proc = subprocess.run(cmd, stdout=stdout or sys.stdout, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(
+        cmd, stdout=stdout or sys.stdout, stderr=subprocess.PIPE, text=True, check=False
+    )
     if proc.returncode != 0 and proc.stderr:
         sys.stderr.write(proc.stderr)
     return proc.returncode
 
 
 def iter_dump(
-    init_dir: Optional[str] = None,
-    init_file: Optional[str] = None,
+    init_dir: str | None = None,
+    init_file: str | None = None,
     quick: bool = False,
-    emacs_bin: Optional[str] = None,
-    extra_args: Optional[Sequence[str]] = None,
+    emacs_bin: str | None = None,
+    extra_args: Sequence[str] | None = None,
     verbose: bool = False,
 ):
     """Run Emacs in batch mode and yield dumped JSON Lines incrementally.
@@ -151,20 +153,25 @@ def iter_dump(
 
     def _read_stderr():
         if proc.stderr:
-            for chunk in proc.stderr:
-                err_chunks.append(chunk)
+            err_chunks.extend(proc.stderr)
 
     reader_thread = None
     if not verbose:
         reader_thread = threading.Thread(target=_read_stderr, daemon=True)
         reader_thread.start()
 
-    if proc.stdout:
-        for line in proc.stdout:
-            yield line
-
-    if reader_thread:
-        reader_thread.join()
+    try:
+        if proc.stdout:
+            yield from proc.stdout
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        if reader_thread and reader_thread.is_alive():
+            reader_thread.join(timeout=1)
 
     rc = proc.wait()
     if rc != 0:
