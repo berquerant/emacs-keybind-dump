@@ -10,8 +10,16 @@ description = "Dump Emacs keybindings to JSONL"
 run = "uv run keybind-dump -f jsonl"
 
 [tasks.test]
-description = "Run tests with uv"
+description = "Run all tests (unit and E2E) with uv"
 run = "uv run python -m unittest discover -s tests"
+
+[tasks."test:unit"]
+description = "Run fast unit tests with uv"
+run = "uv run python -m unittest tests/test_core.py"
+
+[tasks."test:e2e"]
+description = "Run E2E build and install tests with uv"
+run = "uv run python -m unittest tests/test_e2e_install.py"
 
 [tasks.lint]
 description = "Run linter and type checker with uv"

@@ -195,7 +195,15 @@ def main() -> None:
     if args.dry_run and status_res.stdout.strip():
         print("[DRY-RUN] Notice: Git working tree is dirty (skipped failure in dry-run mode).")
 
-    # 5. Update files
+    # 5. Run test suite including E2E install test
+    print("Running tests (including E2E package install)...")
+    test_cmd = ["uv", "run", "python", "-m", "unittest", "discover", "-s", "tests"]
+    if args.dry_run:
+        print(f"[DRY-RUN] Would run: {' '.join(test_cmd)}")
+    else:
+        subprocess.run(test_cmd, check=True)
+
+    # 6. Update files
     try:
         update_pyproject_version(pyproject_path, version, dry_run=args.dry_run)
         update_uv_lock(dry_run=args.dry_run)

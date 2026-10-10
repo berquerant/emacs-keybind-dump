@@ -39,8 +39,14 @@ Dump, filter, analyze, and format Emacs keybindings across keymaps.
 # Dump keybindings directly to stdout as JSONL via task runner
 mise run dump
 
-# Run test suite
+# Run all tests (unit and E2E)
 mise run test
+
+# Run fast unit tests only
+mise run test:unit
+
+# Run E2E build & pip install tests
+mise run test:e2e
 
 # Run linter and type checker
 mise run lint
