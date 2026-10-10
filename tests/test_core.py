@@ -162,22 +162,28 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
     def test_keymap_stats_table_driven(self):
         cases = [
             {
-                "name": "dired-mode-map has score 2 (C-x C-f overlap 1, q overlap 1)",
+                "name": "dired-mode-map has 2 bindings, both shared (C-x C-f, q)",
                 "keymap": "dired-mode-map",
                 "expected_score": 2,
-                "expected_bindings": 2,
+                "expected_total": 2,
+                "expected_shared": 2,
+                "expected_exclusive": 0,
             },
             {
-                "name": "global-map has score 1 (C-x C-f overlap 1, C-x C-s overlap 0)",
+                "name": "global-map has 2 bindings, 1 shared (C-x C-f) and 1 exclusive (C-x C-s)",
                 "keymap": "global-map",
                 "expected_score": 1,
-                "expected_bindings": 2,
+                "expected_total": 2,
+                "expected_shared": 1,
+                "expected_exclusive": 1,
             },
             {
-                "name": "quote-mode-map has score 0 (isolated keymap)",
+                "name": "quote-mode-map has 1 exclusive binding, 0 shared",
                 "keymap": "quote-mode-map",
                 "expected_score": 0,
-                "expected_bindings": 1,
+                "expected_total": 1,
+                "expected_shared": 0,
+                "expected_exclusive": 1,
             },
         ]
         stats = {s.keymap: s for s in keymap_duplicate_stats(self.coll)}
@@ -186,7 +192,9 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
                 stat = stats.get(c["keymap"])
                 self.assertIsNotNone(stat)
                 self.assertEqual(stat.total_duplicate_score, c["expected_score"])
-                self.assertEqual(stat.unique_bindings_count, c["expected_bindings"])
+                self.assertEqual(stat.total_bindings, c["expected_total"])
+                self.assertEqual(stat.shared_bindings, c["expected_shared"])
+                self.assertEqual(stat.exclusive_bindings, c["expected_exclusive"])
 
     def test_tsv_generation_table_driven(self):
         cases = [
@@ -244,18 +252,24 @@ class TestKeybindCollectionTableDriven(unittest.TestCase):
         # JSON format stats
         json_out = _format_stats(self.coll, target="both", fmt="json", min_count=2, limit=None)
         data = json.loads(json_out)
+        self.assertIn("summary", data)
         self.assertIn("sequences", data)
         self.assertIn("keymaps", data)
         self.assertEqual(data["sequences"][0]["sequence"], "C-x C-f")
+        self.assertTrue(data["sequences"][0]["has_conflict"])
+        self.assertIn("top_overlaps", data["keymaps"][0])
 
         # TSV format stats
         tsv_out = _format_stats(self.coll, target="sequence", fmt="tsv", min_count=2, limit=None)
-        self.assertIn("sequence\tcount\tkeymaps", tsv_out)
+        self.assertIn("sequence\tcount\thas_conflict\tkeymaps\tcommands", tsv_out)
 
         # Text format stats
         text_out = _format_stats(self.coll, target="both", fmt="text", min_count=2, limit=None)
+        self.assertIn("=== Summary Overview ===", text_out)
         self.assertIn("=== Sequence Duplicate Stats ===", text_out)
-        self.assertIn("=== Keymap Total Duplicate Score Stats ===", text_out)
+        self.assertIn("=== Keymap Duplicate Stats ===", text_out)
+        self.assertIn("exclusive:", text_out)
+        self.assertIn("top overlaps:", text_out)
 
     def test_cli_format_collection(self):
         from keybind_dump.cli import _format_collection

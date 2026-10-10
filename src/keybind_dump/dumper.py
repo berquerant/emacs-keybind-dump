@@ -70,6 +70,7 @@ def run_dump(
     quick: bool = False,
     emacs_bin: Optional[str] = None,
     extra_args: Optional[Sequence[str]] = None,
+    verbose: bool = False,
     stdout=None,
     stderr=None,
 ) -> int:
@@ -81,5 +82,67 @@ def run_dump(
         emacs_bin=emacs_bin,
         extra_args=extra_args,
     )
-    proc = subprocess.run(cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr)
+    if verbose:
+        proc = subprocess.run(cmd, stdout=stdout or sys.stdout, stderr=stderr or sys.stderr)
+        return proc.returncode
+
+    proc = subprocess.run(cmd, stdout=stdout or sys.stdout, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0 and proc.stderr:
+        sys.stderr.write(proc.stderr)
     return proc.returncode
+
+
+def iter_dump(
+    init_dir: Optional[str] = None,
+    init_file: Optional[str] = None,
+    quick: bool = False,
+    emacs_bin: Optional[str] = None,
+    extra_args: Optional[Sequence[str]] = None,
+    verbose: bool = False,
+):
+    """Run emacs in batch mode and yield dumped JSON Lines directly.
+
+    Normally suppresses Emacs stderr unless an error occurs (non-zero exit code)
+    or verbose=True is specified.
+    """
+    import threading
+
+    cmd = build_emacs_cmd(
+        init_dir=init_dir,
+        init_file=init_file,
+        quick=quick,
+        emacs_bin=emacs_bin,
+        extra_args=extra_args,
+    )
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr if verbose else subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+
+    err_chunks: list[str] = []
+
+    def _read_stderr():
+        if proc.stderr:
+            for chunk in proc.stderr:
+                err_chunks.append(chunk)
+
+    reader_thread = None
+    if not verbose:
+        reader_thread = threading.Thread(target=_read_stderr, daemon=True)
+        reader_thread.start()
+
+    if proc.stdout:
+        for line in proc.stdout:
+            yield line
+
+    if reader_thread:
+        reader_thread.join()
+
+    rc = proc.wait()
+    if rc != 0:
+        if err_chunks:
+            sys.stderr.write("".join(err_chunks))
+        raise RuntimeError(f"Emacs batch dump exited with error code {rc}")

@@ -7,7 +7,7 @@ PYTHONPATH = "src"
 
 [tasks.dump]
 description = "Dump Emacs keybindings to JSONL"
-run = "uv run keybind-dump dump"
+run = "uv run keybind-dump -f jsonl"
 
 [tasks.test]
 description = "Run tests with uv"

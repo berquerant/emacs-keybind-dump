@@ -1,13 +1,13 @@
 # emacs-keybind-dump
 
-Dump, analyze, filter, and format Emacs keybindings across keymaps.
+Dump, filter, analyze, and format Emacs keybindings across keymaps.
 
 ## Features
 
-- **Batch Dump**: Run Emacs in batch mode (`emacs --batch`) to extract all keybindings (`sequence`, `keymap`, `command`) into JSONL.
+- **Direct Emacs Extraction**: Extracts all keybindings (`sequence`, `keymap`, `command`) directly from Emacs (using `$EMACSD` by default) without intermediate steps.
 - **Unified Querying & Filtering**:
   - Filter by sequence, keymap, or command with regex patterns.
-  - Duplicate-only detection (`-d, --duplicates-only`).
+  - Duplicate-only detection (`-D, --duplicates-only`).
 - **Flexible Output Formats (`-f, --format`)**:
   - `text`: Human-readable list of bindings.
   - `tsv`: Matrix representation of keybindings vs keymaps with assigned commands (or `None`).
@@ -29,73 +29,78 @@ mise run test       # Run test suite with uv
 
 ## Usage
 
-### 1. Dump Keybindings from Emacs (`keybind-dump dump`)
+`keybind-dump` is a single unified command. If an input file is not given, it **automatically dumps keybindings directly from Emacs** (using `$EMACSD` or `$EMACS_INIT_DIR` by default).
+
+### 1. Extract and View Keybindings Directly from Emacs
 
 ```bash
-# Dump keybindings to stdout using default init dir ($EMACSD or $EMACS_INIT_DIR)
-./bin/keybind-dump dump > keybindings.jsonl
+# Dump and display all keybindings from Emacs ($EMACSD)
+keybind-dump
+
+# Dump Emacs keybindings directly into JSONL
+keybind-dump -f jsonl > keybindings.jsonl
 # or via mise
 mise run dump > keybindings.jsonl
 
-# Specify custom init directory (loads DIR/init.el)
-./bin/keybind-dump dump -d ~/.config/emacs > keybindings.jsonl
+# Quick mode (skip user init, extract only default Emacs bindings)
+keybind-dump -Q
 
-# Specify custom init file
-./bin/keybind-dump dump -i /path/to/custom-init.el > keybindings.jsonl
-
-# Quick mode (skip loading user init, loads only default Emacs keybindings)
-./bin/keybind-dump dump -Q > keybindings.jsonl
-
-# Pipe directly into filter/format without temporary file!
-./bin/keybind-dump dump | ./bin/keybind-dump -d -f tsv
+# Specify custom init directory or init file
+keybind-dump -d ~/.config/emacs
+keybind-dump -i /path/to/custom-init.el
 ```
 
-### 2. View and Filter Keybindings
+### 2. Direct Emacs Extraction with Filters & Formats (One-liner!)
+
+No temporary files or pipelines needed:
 
 ```bash
-# Display all keybindings (text format)
-./bin/keybind-dump keybindings.jsonl
+# Filter duplicate keybindings directly from Emacs as TSV matrix
+keybind-dump -D -f tsv -o duplicates.tsv
 
-# Filter by sequence regex
-./bin/keybind-dump keybindings.jsonl -s "^C-x C-f"
+# Extract specific keymaps as columns in TSV
+keybind-dump -k global-map -k dired-mode-map -f tsv
 
-# Filter by keymap and command regex
-./bin/keybind-dump keybindings.jsonl -k "Buffer-menu" -c "toggle"
+# Find bindings by sequence regex directly from Emacs
+keybind-dump -s "^C-x C-f"
 
-# Filter duplicate keybindings (conflicts across >= 2 keymaps)
-./bin/keybind-dump keybindings.jsonl --duplicates-only
+# Filter by command regex
+keybind-dump -c "toggle"
 ```
 
-### 3. Output Formats (`-f, --format`)
+### 3. Processing Saved JSONL Files or Standard Input
+
+You can also pass a previously dumped JSONL file or pipe:
 
 ```bash
-# TSV Matrix: Keybindings as rows, keymaps as columns
-./bin/keybind-dump keybindings.jsonl -f tsv
+# Analyze a saved JSONL file
+keybind-dump keybindings.jsonl -D -f json
 
-# TSV Matrix specifying specific keymaps as columns
-./bin/keybind-dump keybindings.jsonl -k global-map -k dired-mode-map -f tsv -o matrix.tsv
-
-# Nested JSON: {sequence: {keymap: command}}
-./bin/keybind-dump keybindings.jsonl -f json
-
-# Flat JSONL stream
-./bin/keybind-dump keybindings.jsonl -f jsonl
+# Read from stdin
+cat keybindings.jsonl | keybind-dump -s "^C-c"
 ```
 
 ### 4. Duplicate Statistics Summary (`--stats`)
 
 Use `--stats` to compute summary metrics across keybindings, and combine with `-f, --format` to choose the output representation:
 
-```bash
-# Text summary (default: sequence duplicate counts and keymap scores)
-./bin/keybind-dump keybindings.jsonl --stats
+- **Overall Overview**: Total records, unique sequences, unique keymaps, and shared sequence conflict rate.
+- **Keymap Stats**: Total bindings, exclusive (unique) bindings, shared bindings, conflict rate (%), conflict score, and top overlapping keymaps.
+- **Sequence Stats**: Overlap frequency, conflict status (`conflict` when commands differ across keymaps vs `same-cmd`), and keymap-to-command mappings.
 
-# Sequence duplicate stats only
-./bin/keybind-dump keybindings.jsonl --stats sequence --limit 10
+```bash
+# Summary of all duplicates directly from Emacs (text format)
+keybind-dump --stats
+
+# Sequence duplicate stats only (top 10)
+keybind-dump --stats sequence --limit 10
+
+# Keymap duplicate stats only
+keybind-dump --stats keymap --limit 10
 
 # Structured JSON summary
-./bin/keybind-dump keybindings.jsonl --stats -f json
+keybind-dump --stats -f json
 
 # TSV summary
-./bin/keybind-dump keybindings.jsonl --stats sequence -f tsv
+keybind-dump --stats sequence -f tsv
 ```

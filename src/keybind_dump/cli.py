@@ -11,26 +11,53 @@ import signal
 import sys
 from typing import List, Optional
 
-from keybind_dump.dumper import run_dump
+from keybind_dump.dumper import iter_dump
 from keybind_dump.models import KeyBinding, KeybindCollection
 from keybind_dump.stats import (
     keymap_duplicate_stats,
+    overall_summary_stats,
     sequence_duplicate_stats,
 )
 
 
-def _load_collection(file_path: Optional[str]) -> KeybindCollection:
+def _load_collection(
+    file_path: Optional[str],
+    dump: bool = False,
+    init_dir: Optional[str] = None,
+    init_file: Optional[str] = None,
+    quick: bool = False,
+    emacs_bin: Optional[str] = None,
+    verbose: bool = False,
+) -> KeybindCollection:
+    """Load KeybindCollection from file, stdin, or direct Emacs dump."""
+    # 1. If explicit dump requested or (input is not specified and stdin is interactive)
+    should_dump = dump or (file_path is None and sys.stdin.isatty())
+
+    if should_dump:
+        lines = iter_dump(
+            init_dir=init_dir,
+            init_file=init_file,
+            quick=quick,
+            emacs_bin=emacs_bin,
+            verbose=verbose,
+        )
+        return KeybindCollection.from_jsonl(lines)
+
+    # 2. From file or stdin
     if file_path and file_path != "-":
         with open(file_path, "r", encoding="utf-8") as f:
             return KeybindCollection.from_jsonl(f)
     else:
         if sys.stdin.isatty():
-            print(
-                "Error: No input file specified and stdin is an interactive terminal.\n"
-                "Please provide a JSONL file or pipe data via stdin. (Run with -h for help)",
-                file=sys.stderr,
+            # Fallback to direct dump if stdin is terminal
+            lines = iter_dump(
+                init_dir=init_dir,
+                init_file=init_file,
+                quick=quick,
+                emacs_bin=emacs_bin,
+                verbose=verbose,
             )
-            sys.exit(1)
+            return KeybindCollection.from_jsonl(lines)
         return KeybindCollection.from_jsonl(sys.stdin)
 
 
@@ -42,6 +69,8 @@ def _format_stats(
     limit: Optional[int],
 ) -> str:
     """Format duplicate statistics as text, json, or tsv."""
+    summary = overall_summary_stats(collection)
+
     seq_stats = []
     if target in ("sequence", "both"):
         seq_stats = sequence_duplicate_stats(collection, min_count=min_count)
@@ -55,61 +84,145 @@ def _format_stats(
             km_stats = km_stats[:limit]
 
     if fmt == "json":
-        data = {}
+        data = {
+            "summary": {
+                "total_records": summary.total_records,
+                "unique_sequences": summary.unique_sequences,
+                "unique_keymaps": summary.unique_keymaps,
+                "shared_sequences": summary.shared_sequences,
+                "sequence_conflict_rate": round(summary.sequence_conflict_rate, 4),
+            }
+        }
         if target in ("sequence", "both"):
             data["sequences"] = [
-                {"sequence": s.sequence, "count": s.count, "keymaps": s.keymaps}
+                {
+                    "sequence": s.sequence,
+                    "count": s.count,
+                    "keymaps": s.keymaps,
+                    "distinct_commands_count": s.distinct_commands_count,
+                    "has_conflict": s.has_conflict,
+                    "commands": s.commands,
+                }
                 for s in seq_stats
             ]
         if target in ("keymap", "both"):
             data["keymaps"] = [
                 {
                     "keymap": k.keymap,
+                    "total_bindings": k.total_bindings,
+                    "exclusive_bindings": k.exclusive_bindings,
+                    "shared_bindings": k.shared_bindings,
+                    "conflict_rate": round(k.conflict_rate, 4),
                     "total_duplicate_score": k.total_duplicate_score,
-                    "unique_bindings_count": k.unique_bindings_count,
+                    "top_overlaps": [
+                        {"keymap": other_km, "shared_count": cnt}
+                        for other_km, cnt in k.top_overlaps
+                    ],
                 }
                 for k in km_stats
             ]
-        return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        return json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n"
 
     elif fmt == "tsv":
         out = io.StringIO()
         writer = csv.writer(out, delimiter="\t", lineterminator="\n")
         if target == "sequence":
-            writer.writerow(["sequence", "count", "keymaps"])
+            writer.writerow(["sequence", "count", "has_conflict", "keymaps", "commands"])
             for s in seq_stats:
-                writer.writerow([s.sequence, s.count, ",".join(s.keymaps)])
+                cmd_repr = "; ".join(f"{km}->{cmd}" for km, cmd in sorted(s.commands.items()))
+                writer.writerow([s.sequence, s.count, str(s.has_conflict), ",".join(s.keymaps), cmd_repr])
         elif target == "keymap":
-            writer.writerow(["keymap", "total_duplicate_score", "unique_bindings_count"])
+            writer.writerow([
+                "keymap",
+                "total_bindings",
+                "exclusive_bindings",
+                "shared_bindings",
+                "conflict_rate",
+                "total_duplicate_score",
+                "top_overlaps",
+            ])
             for k in km_stats:
-                writer.writerow([k.keymap, k.total_duplicate_score, k.unique_bindings_count])
+                ov_repr = "; ".join(f"{other}:{cnt}" for other, cnt in k.top_overlaps)
+                writer.writerow([
+                    k.keymap,
+                    k.total_bindings,
+                    k.exclusive_bindings,
+                    k.shared_bindings,
+                    f"{k.conflict_rate:.1%}",
+                    k.total_duplicate_score,
+                    ov_repr,
+                ])
         else:
             # both
+            writer.writerow(["# Overall Summary"])
+            writer.writerow(["total_records", "unique_sequences", "unique_keymaps", "shared_sequences", "conflict_rate"])
+            writer.writerow([
+                summary.total_records,
+                summary.unique_sequences,
+                summary.unique_keymaps,
+                summary.shared_sequences,
+                f"{summary.sequence_conflict_rate:.1%}",
+            ])
+            writer.writerow([])
             writer.writerow(["# Sequence Duplicate Stats"])
-            writer.writerow(["sequence", "count", "keymaps"])
+            writer.writerow(["sequence", "count", "has_conflict", "keymaps", "commands"])
             for s in seq_stats:
-                writer.writerow([s.sequence, s.count, ",".join(s.keymaps)])
+                cmd_repr = "; ".join(f"{km}->{cmd}" for km, cmd in sorted(s.commands.items()))
+                writer.writerow([s.sequence, s.count, str(s.has_conflict), ",".join(s.keymaps), cmd_repr])
             writer.writerow([])
             writer.writerow(["# Keymap Duplicate Stats"])
-            writer.writerow(["keymap", "total_duplicate_score", "unique_bindings_count"])
+            writer.writerow([
+                "keymap",
+                "total_bindings",
+                "exclusive_bindings",
+                "shared_bindings",
+                "conflict_rate",
+                "total_duplicate_score",
+                "top_overlaps",
+            ])
             for k in km_stats:
-                writer.writerow([k.keymap, k.total_duplicate_score, k.unique_bindings_count])
+                ov_repr = "; ".join(f"{other}:{cnt}" for other, cnt in k.top_overlaps)
+                writer.writerow([
+                    k.keymap,
+                    k.total_bindings,
+                    k.exclusive_bindings,
+                    k.shared_bindings,
+                    f"{k.conflict_rate:.1%}",
+                    k.total_duplicate_score,
+                    ov_repr,
+                ])
         return out.getvalue()
 
     else:
         # text format
         lines = []
+        if target == "both":
+            lines.append("=== Summary Overview ===")
+            lines.append(
+                f"Records: {summary.total_records} | Sequences: {summary.unique_sequences} | "
+                f"Keymaps: {summary.unique_keymaps} | Shared Sequences: {summary.shared_sequences} ({summary.sequence_conflict_rate:.1%})"
+            )
+            lines.append("")
+
         if target in ("sequence", "both"):
             lines.append("=== Sequence Duplicate Stats ===")
             for s in seq_stats:
-                lines.append(f"{s.count:3d} keymaps: '{s.sequence}' (maps: {', '.join(s.keymaps)})")
+                status = "conflict" if s.has_conflict else "same-cmd"
+                cmd_summary = ", ".join(f"{km}->{cmd}" for km, cmd in sorted(s.commands.items()))
+                lines.append(f"[{s.sequence}] in {s.count} maps ({status}): {cmd_summary}")
+
         if target in ("keymap", "both"):
-            if lines:
+            if lines and target != "both":
                 lines.append("")
-            lines.append("=== Keymap Total Duplicate Score Stats ===")
+            elif lines and target == "both":
+                lines.append("")
+            lines.append("=== Keymap Duplicate Stats ===")
             for k in km_stats:
+                ov_str = ", ".join(f"{other} ({cnt})" for other, cnt in k.top_overlaps) if k.top_overlaps else "none"
                 lines.append(
-                    f"score: {k.total_duplicate_score:4d} (total bindings: {k.unique_bindings_count:4d}) - {k.keymap}"
+                    f"{k.keymap}:\n"
+                    f"  total: {k.total_bindings:d}, exclusive: {k.exclusive_bindings:d}, shared: {k.shared_bindings:d} ({k.conflict_rate:.1%}) | score: {k.total_duplicate_score}\n"
+                    f"  top overlaps: {ov_str}"
                 )
         return "\n".join(lines) + ("\n" if lines else "")
 
@@ -133,14 +246,14 @@ def _format_collection(
     nested = collection.to_nested_dict()
 
     if fmt == "json":
-        return json.dumps(nested, indent=2, ensure_ascii=False) + "\n"
+        return json.dumps(nested, separators=(",", ":"), ensure_ascii=False) + "\n"
 
     elif fmt == "jsonl":
         out = io.StringIO()
         count = 0
         for seq, km_map in sorted(nested.items()):
             for km, cmd in sorted(km_map.items()):
-                out.write(json.dumps({"sequence": seq, "keymap": km, "command": cmd}, ensure_ascii=False) + "\n")
+                out.write(json.dumps({"sequence": seq, "keymap": km, "command": cmd}, separators=(",", ":"), ensure_ascii=False) + "\n")
                 count += 1
                 if limit and count >= limit:
                     return out.getvalue()
@@ -164,129 +277,98 @@ def main() -> None:
     if hasattr(signal, "SIGPIPE"):
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
+    default_init_dir = os.environ.get("EMACSD") or os.environ.get("EMACS_INIT_DIR")
+
     parser = argparse.ArgumentParser(
         prog="keybind-dump",
-        description="Filter, analyze, format, and dump Emacs keybindings",
+        description="Dump, filter, analyze, and format Emacs keybindings",
     )
-    subparsers = parser.add_subparsers(dest="subcommand")
+    parser.add_argument(
+        "input",
+        nargs="?",
+        default=None,
+        help="Input JSONL file or - for stdin (if omitted and not piped, dumps directly from Emacs)",
+    )
 
-    # dump subcommand
-    p_dump = subparsers.add_parser(
-        "dump",
-        help="Dump keybindings from Emacs to JSONL",
-        description="Run Emacs in batch mode to dump keybindings as JSON Lines.",
+    # Dump source options
+    g_dump = parser.add_argument_group("Dump options (when running directly with Emacs)")
+    g_dump.add_argument(
+        "--dump",
+        action="store_true",
+        help="Force dumping keybindings directly from Emacs",
     )
-    default_init_dir = os.environ.get("EMACSD") or os.environ.get("EMACS_INIT_DIR")
-    p_dump.add_argument(
+    g_dump.add_argument(
         "-d",
         "--init-directory",
         default=default_init_dir,
-        help="Set Emacs init directory and load DIR/init.el (default: $EMACSD or $EMACS_INIT_DIR)",
+        help="Emacs init directory and load DIR/init.el (default: $EMACSD or $EMACS_INIT_DIR)",
     )
-    p_dump.add_argument(
+    g_dump.add_argument(
         "-i",
         "--init-file",
         default=os.environ.get("EMACS_INIT_FILE"),
-        help="Load specified init file (default: $EMACS_INIT_FILE)",
+        help="Emacs init file to load (default: $EMACS_INIT_FILE)",
     )
-    p_dump.add_argument(
+    g_dump.add_argument(
         "-Q",
         "--quick",
         action="store_true",
         help="Run without loading user init (default when neither init-directory nor init-file is specified)",
     )
-    p_dump.add_argument(
+    g_dump.add_argument(
         "--emacs-bin",
         default=os.environ.get("EMACS_BIN", "emacs"),
         help="Path to emacs executable (default: $EMACS_BIN or emacs)",
     )
-    p_dump.add_argument(
-        "-o",
-        "--output",
-        help="Write output to file instead of stdout",
-    )
-    p_dump.add_argument(
-        "emacs_args",
-        nargs="*",
-        help="Extra arguments passed to emacs (use -- before extra args if needed)",
+    g_dump.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Show Emacs stderr even when execution succeeds",
     )
 
-    # Filter / format options (default mode or analyze)
-    p_filter = subparsers.add_parser(
-        "filter",
-        help="Filter, analyze, and format keybinding dump (default when no subcommand is specified)",
-        description="Filter, analyze, and format keybinding dump.",
+    # Filter options
+    g_filter = parser.add_argument_group("Filter options")
+    g_filter.add_argument("-D", "--duplicates-only", action="store_true", help="Include only sequences with >=2 keymaps")
+    g_filter.add_argument("-s", "--sequence", dest="seq_pattern", help="Filter by sequence regex pattern")
+    g_filter.add_argument("-k", "--keymap", action="append", dest="keymap_patterns", help="Filter by keymap regex pattern (can be specified multiple times; also defines TSV columns)")
+    g_filter.add_argument("-c", "--command", dest="cmd_pattern", help="Filter by command regex pattern")
+
+    # Stats mode option
+    g_stats = parser.add_argument_group("Summary / Statistics options")
+    g_stats.add_argument(
+        "--stats",
+        nargs="?",
+        const="both",
+        choices=["sequence", "keymap", "both"],
+        help="Calculate duplicate statistics summary (default target: both)",
     )
-    for p in (parser, p_filter):
-        p.add_argument("input", nargs="?", default="-", help="Input JSONL file or - for stdin (default: -)")
-        p.add_argument("-d", "--duplicates-only", action="store_true", help="Include only sequences with >=2 keymaps")
-        p.add_argument("-s", "--sequence", dest="seq_pattern", help="Filter by sequence regex pattern")
-        p.add_argument("-k", "--keymap", action="append", dest="keymap_patterns", help="Filter by keymap regex pattern (can be specified multiple times; also defines TSV columns)")
-        p.add_argument("-c", "--command", dest="cmd_pattern", help="Filter by command regex pattern")
+    g_stats.add_argument("--min-count", type=int, default=2, help="Min duplicate count for sequence stats (default: 2)")
+    g_stats.add_argument("--limit", type=int, help="Max entries to output")
 
-        # Stats mode option
-        p.add_argument(
-            "--stats",
-            nargs="?",
-            const="both",
-            choices=["sequence", "keymap", "both"],
-            help="Calculate duplicate statistics summary (default target: both)",
-        )
-        p.add_argument("--min-count", type=int, default=2, help="Min duplicate count for sequence stats (default: 2)")
-        p.add_argument("--limit", type=int, help="Max entries to output")
+    # Output formatting options
+    g_fmt = parser.add_argument_group("Output formatting options")
+    g_fmt.add_argument(
+        "-f",
+        "--format",
+        choices=["text", "tsv", "json", "jsonl"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    g_fmt.add_argument("--none-value", default="None", help="Placeholder for missing bindings in TSV matrix (default: None)")
+    g_fmt.add_argument("-o", "--output", help="Write output to file instead of stdout")
 
-        # Output formatting options
-        p.add_argument(
-            "-f",
-            "--format",
-            choices=["text", "tsv", "json", "jsonl"],
-            default="text",
-            help="Output format (default: text)",
-        )
-        p.add_argument("--none-value", default="None", help="Placeholder for missing bindings in TSV matrix (default: None)")
-        p.add_argument("-o", "--output", help="Write output to file instead of stdout")
+    args = parser.parse_args()
 
-    # If first arg is 'dump', parse using subparsers
-    if len(sys.argv) > 1 and sys.argv[1] == "dump":
-        args = parser.parse_args()
-        out_f = open(args.output, "w", encoding="utf-8") if args.output else None
-        try:
-            rc = run_dump(
-                init_dir=args.init_directory,
-                init_file=args.init_file,
-                quick=args.quick,
-                emacs_bin=args.emacs_bin,
-                extra_args=args.emacs_args,
-                stdout=out_f,
-            )
-            if rc != 0:
-                sys.exit(rc)
-            return
-        finally:
-            if out_f:
-                out_f.close()
-
-    # Otherwise parse as filter/format command
-    args, unknown = parser.parse_known_args()
-    if getattr(args, "subcommand", None) == "dump":
-        out_f = open(args.output, "w", encoding="utf-8") if args.output else None
-        try:
-            rc = run_dump(
-                init_dir=args.init_directory,
-                init_file=args.init_file,
-                quick=args.quick,
-                emacs_bin=args.emacs_bin,
-                extra_args=args.emacs_args,
-                stdout=out_f,
-            )
-            if rc != 0:
-                sys.exit(rc)
-            return
-        finally:
-            if out_f:
-                out_f.close()
-
-    collection = _load_collection(args.input)
+    collection = _load_collection(
+        file_path=args.input,
+        dump=args.dump,
+        init_dir=args.init_directory,
+        init_file=args.init_file,
+        quick=args.quick,
+        emacs_bin=args.emacs_bin,
+        verbose=args.verbose,
+    )
 
     # Combine keymap patterns if multiple specified (e.g. "^(km1|km2)$")
     km_pattern = None
