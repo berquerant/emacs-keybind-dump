@@ -200,8 +200,3 @@ keybind-dump --stats sequence -f tsv
 | `--none-value STR` | Format | Placeholder for missing bindings in TSV matrix (default: `None`). |
 | `-o, --output FILE` | Output | Write output to a file instead of stdout. |
 
----
-
-## License
-
-MIT
