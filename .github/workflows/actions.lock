@@ -5,7 +5,7 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
-        - 'jdx/mise-action@v5.1.1'
+        - 'jdx/mise-action@v5.2.4'
         - 'purcell/setup-emacs@8415786a52b3a84babd7ffc92a802b06e3780c17'
 dependencies:
     'actions/checkout@v7.0.1':
@@ -13,9 +13,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'jdx/mise-action@v5.1.1':
-        ref: 'v5.1.1'
-        commit: 'sha1-2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca'
+    'jdx/mise-action@v5.2.4':
+        ref: 'v5.2.4'
+        commit: 'sha1-6be3c7ed4c21d4f76b208d351d95aac273ebb76d'
         owner_id: 216188
         repo_id: 738284564
     'purcell/setup-emacs@8415786a52b3a84babd7ffc92a802b06e3780c17':
