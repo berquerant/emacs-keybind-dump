@@ -48,3 +48,8 @@ jobs:
         uses: jdx/mise-action@v5.1.1
       - name: Run tests (unit and E2E)
         run: mise run test
+
+  actions-lock-verify:
+    permissions:
+      contents: read
+    uses: berquerant/reusable-workflows/.github/workflows/actions-lock-verify.yml@v0.1.0
