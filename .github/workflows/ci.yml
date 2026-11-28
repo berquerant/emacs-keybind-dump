@@ -15,6 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  actions-lock-verify:
+    permissions:
+      contents: read # checkout repository for actions-lock-verify
+    uses: berquerant/reusable-workflows/.github/workflows/actions-lock-verify.yml@v0.10.1
+
   lint:
     name: Lint
     timeout-minutes: 10
